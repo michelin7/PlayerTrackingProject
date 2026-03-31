@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PS&F{% endblock %} — Player Scouting & Fitness</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <span class="logo-icon">&#x1F3D2;</span>
+                <span class="logo-text">PS&amp;F</span>
+            </a>
+            <div class="nav-links">
+                <a href="{{ url_for('upload') }}" class="nav-link {% if request.endpoint == 'upload' %}active{% endif %}" data-i18n="nav_process">Обработка</a>
+                <a href="{{ url_for('results_list_page') }}" class="nav-link {% if request.endpoint == 'results_list_page' %}active{% endif %}" data-i18n="nav_results">Результаты</a>
+                <a href="{{ url_for('config_page') }}" class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}" data-i18n="nav_config">Конфигурация</a>
+                <button class="lang-toggle" id="langToggle" title="Switch language">RU</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p data-i18n="footer_title">Player Scouting &amp; Fitness &mdash; Система видеоаналитики хоккейных матчей</p>
+            <p class="footer-sub">YOLO + ByteTrack + CoreML | Медведев М.Д. | НИР 2025</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

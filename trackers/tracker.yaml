@@ -1,0 +1,21 @@
+# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+
+# Default Ultralytics settings for ByteTrack tracker when using mode="track"
+# For documentation and examples see https://docs.ultralytics.com/modes/track/
+# For ByteTrack source code see https://github.com/ifzhang/ByteTrack
+
+tracker_type: botsort # tracker type, ['botsort', 'bytetrack']
+track_high_thresh: 0.5 # threshold for the first association 0.25
+track_low_thresh: 0.2 # threshold for the second association
+new_track_thresh: 0.6 # threshold for init new track if the detection does not match any tracks
+track_buffer: 40 # buffer to calculate the time when to remove tracks 50 default
+match_thresh: 0.9 # threshold for matching tracks 0.8
+fuse_score: True # Whether to fuse confidence scores with the iou distances before matching
+# min_box_area: 10  # threshold for min box areas(for tracker evaluation, not used for now)
+
+# BoT-SORT settings
+gmc_method: sparseOptFlow # method of global motion compensation
+proximity_thresh: 0.5
+appearance_thresh: 0.4
+with_reid: True
+model: auto # ReID model name/path

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Player Scouting & Fitness{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-content">
+        <h1 class="hero-title" data-i18n="hero_title">Player Scouting & Fitness</h1>
+        <p class="hero-subtitle" data-i18n="hero_subtitle">Полуавтоматическая система видеоаналитики хоккейных матчей: индивидуальный скаутинг игроков и оценка физических кондиций без дорогостоящих датчиков</p>
+        <div class="hero-features">
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F3A5;</div>
+                <h3 data-i18n="feat_scouting_title">Скаутинг по видео</h3>
+                <p data-i18n="feat_scouting_desc">Автоматическая нарезка видео по каждому игроку для индивидуального анализа действий на льду</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F3C3;</div>
+                <h3 data-i18n="feat_fitness_title">Физические кондиции</h3>
+                <p data-i18n="feat_fitness_desc">Пройденная дистанция, средняя и максимальная скорость (км/ч) — данные, ранее доступные только с GPS/LPS-датчиками</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4B0;</div>
+                <h3 data-i18n="feat_nosensor_title">Без датчиков</h3>
+                <p data-i18n="feat_nosensor_desc">Достаточно трансляционного видео — не нужны дорогостоящие системы оптического или инерциального трекинга</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F3AF;</div>
+                <h3 data-i18n="feat_detection_title">Детекция и трекинг</h3>
+                <p data-i18n="feat_detection_desc">YOLO-модель с ускорением на Apple Neural Engine + ByteTrack для непрерывного отслеживания игроков</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F524;</div>
+                <h3 data-i18n="feat_ident_title">Идентификация</h3>
+                <p data-i18n="feat_ident_desc">Классификация команд по цветам формы и распознавание номеров с учётом контекста звеньев</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x2705;</div>
+                <h3 data-i18n="feat_review_title">Ревизия результатов</h3>
+                <p data-i18n="feat_review_desc">Полуавтоматический режим: система размечает, человек проверяет и корректирует</p>
+            </div>
+        </div>
+        <div class="hero-actions">
+            <a href="{{ url_for('upload') }}" class="btn btn-primary" data-i18n="btn_upload">Загрузить видео</a>
+            <a href="{{ url_for('config_page') }}" class="btn btn-secondary" data-i18n="btn_configs">Конфигурации</a>
+        </div>
+    </div>
+</section>
+
+<section class="pipeline-section">
+    <h2 class="section-title" data-i18n="pipeline_title">Конвейер обработки</h2>
+    <div class="pipeline">
+        <div class="pipeline-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h4 data-i18n="pipe1_title">Конфигурация</h4>
+                <p data-i18n="pipe1_desc">Составы команд, цвета формы, защитные пары и тройки нападающих</p>
+            </div>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h4 data-i18n="pipe2_title">Детекция + Трекинг</h4>
+                <p data-i18n="pipe2_desc">Обнаружение игроков и непрерывное отслеживание на протяжении видео</p>
+            </div>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h4 data-i18n="pipe3_title">Идентификация</h4>
+                <p data-i18n="pipe3_desc">Определение команды по цвету формы, распознавание номера, сопоставление с составом</p>
+            </div>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <h4 data-i18n="pipe4_title">Ревизия</h4>
+                <p data-i18n="pipe4_desc">Проверка автоматической разметки, исправление ошибок, назначение неопознанных треков</p>
+            </div>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <h4 data-i18n="pipe5_title">Результаты</h4>
+                <p data-i18n="pipe5_desc">TOI, дистанция, средняя/макс. скорость, индивидуальные видеонарезки, Excel-отчёт</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="models-section">
+    <h2 class="section-title" data-i18n="models_title">Статус моделей</h2>
+    <div id="models-status" class="models-grid">
+        <div class="model-card loading" data-i18n="models_loading">Загрузка...</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const resp = await fetch('/api/models');
+    const models = await resp.json();
+    const container = document.getElementById('models-status');
+
+    const modelI18nKeys = {
+        'Player_Detection.pt': { name: 'model_det_name', desc: 'model_det_desc' },
+        'LinesDetection.pt':   { name: 'model_seg_name', desc: 'model_seg_desc' },
+        'NumbersRec.pt':       { name: 'model_num_name', desc: 'model_num_desc' },
+        'tracker.yaml':        { name: 'model_trk_name', desc: 'model_trk_desc' },
+        'tracker_fast.yaml':   { name: 'model_trkf_name', desc: 'model_trkf_desc' },
+    };
+
+    container.innerHTML = '';
+    for (const [key, info] of Object.entries(models)) {
+        const keys = modelI18nKeys[key] || { name: null, desc: null };
+        const card = document.createElement('div');
+        card.className = `model-card ${info.exists ? 'model-ok' : 'model-missing'}`;
+        const nameAttr = keys.name ? `data-i18n="${keys.name}"` : '';
+        const descAttr = keys.desc ? `data-i18n="${keys.desc}"` : '';
+        const t = window.PSF_I18N ? window.PSF_I18N.t : (k) => k;
+        const nameText = keys.name ? t(keys.name) : key;
+        const descText = keys.desc ? t(keys.desc) : '';
+        card.innerHTML = `
+            <div class="model-status-icon">${info.exists ? '&#x2705;' : '&#x274C;'}</div>
+            <h4 ${nameAttr}>${nameText}</h4>
+            <p ${descAttr}>${descText}</p>
+            ${info.size_mb ? `<span class="model-size">${info.size_mb} MB</span>` : ''}
+        `;
+        container.appendChild(card);
+    }
+});
+</script>
+{% endblock %}

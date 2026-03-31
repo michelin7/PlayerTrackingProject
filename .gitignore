@@ -1,0 +1,58 @@
+# ===== ML Models (large binaries — download separately) =====
+models/*.pt
+models/*.onnx
+models/*.mlpackage/
+
+# ===== Videos & media =====
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# ===== Runtime data =====
+webapp/results/
+webapp/uploads/
+webapp/configs/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+*.egg-info/
+.env
+.venv/
+env/
+
+# ===== Game analysis data (large directories) =====
+avg_bar_2nd/
+dyn_lok_3rd_2103/
+ska_spr_1st/
+Архив/
+
+# ===== Academic documents =====
+ВКР/
+1 семестр/
+2 семестр/
+*.docx
+*.pptx
+*.xlsx
+*.pdf
+
+# ===== Config files at root (not part of app) =====
+dyn_lok_config.json
+
+# ===== OS & IDE =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+~$*
+
+# ===== Jupyter =====
+ipynb:excel/
+
+# ===== Examples (large videos) =====
+examples/

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Результаты{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Сохранённые результаты</h1>
+    <p class="page-desc">Все обработанные видео на этом компьютере</p>
+</div>
+
+<div id="resultsList"></div>
+<div id="emptyState" style="display:none" class="card" style="text-align:center;padding:3rem">
+    <p style="color:var(--text-muted)">Нет сохранённых результатов. <a href="/upload">Загрузите видео</a> для обработки.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function load() {
+    const resp = await fetch('/api/results-list');
+    const jobs = await resp.json();
+    const container = document.getElementById('resultsList');
+
+    if (!jobs.length) {
+        document.getElementById('emptyState').style.display = '';
+        return;
+    }
+
+    let html = '';
+    for (const job of jobs) {
+        const date = new Date(job.created * 1000).toLocaleString('ru-RU');
+        const statusBadge = job.status === 'completed'
+            ? '<span class="status-badge status-completed">Завершено</span>'
+            : '<span class="status-badge status-review">На ревизии</span>';
+
+        let details = '';
+        if (job.groups_count != null) details += `<span>Игроков: ${job.groups_count}</span>`;
+        if (job.video_count != null) details += `<span>Видео: ${job.video_count}</span>`;
+        if (job.unidentified_count) details += `<span>Без ID: ${job.unidentified_count}</span>`;
+
+        let accuracy = '';
+        if (job.accuracy) {
+            accuracy = `<div class="result-accuracy">Точность авторазметки: <strong>${job.accuracy.accuracy_pct}%</strong> (${job.accuracy.correct} верно, ${job.accuracy.corrected} исправлено, ${job.accuracy.rejected} отклонено)</div>`;
+        }
+
+        let actions = '';
+        if (job.status === 'review') {
+            actions += `<a href="/review/${job.job_id}" class="btn btn-primary btn-sm">Продолжить ревизию</a>`;
+        }
+        if (job.has_excel) {
+            actions += `<a href="/results/${job.excel_path}" class="btn btn-sm" download>Скачать Excel</a>`;
+        }
+        if (job.status === 'completed') {
+            actions += `<a href="/review/${job.job_id}" class="btn btn-sm">Посмотреть</a>`;
+        }
+
+        html += `
+            <div class="card result-card">
+                <div class="result-card-header">
+                    <div>
+                        <span class="result-job-id">${job.job_id}</span>
+                        ${statusBadge}
+                    </div>
+                    <span class="result-date">${date}</span>
+                </div>
+                <div class="result-card-details">${details}</div>
+                ${accuracy}
+                <div class="result-card-actions">${actions}</div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+load();
+</script>
+{% endblock %}

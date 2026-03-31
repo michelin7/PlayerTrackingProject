@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Обработка: {{ job.video }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Обработка видео</h1>
+    <p class="page-desc">{{ job.video }}</p>
+</div>
+
+<div class="job-container">
+    <div class="job-status-card" id="jobCard">
+        <div class="job-status-header">
+            <div class="job-status-indicator" id="statusIndicator">
+                <div class="spinner" id="spinner"></div>
+                <span id="statusText">{{ job.status }}</span>
+            </div>
+            <span class="job-id">ID: {{ job_id }}</span>
+        </div>
+
+        <div class="progress-section">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar" style="width: {{ job.progress }}%"></div>
+            </div>
+            <div class="progress-info">
+                <span id="progressPercent">{{ job.progress }}%</span>
+                <span id="framesInfo">—</span>
+            </div>
+        </div>
+
+        <div class="job-message" id="jobMessage">{{ job.message }}</div>
+
+        <div class="job-profile" id="jobProfile" style="display:none; margin-top:1rem">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem">
+                <div class="profile-stat">
+                    <span class="profile-label">Скорость</span>
+                    <span class="profile-value" id="profFps">—</span>
+                    <span class="profile-unit">FPS</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-label">YOLO + Track</span>
+                    <span class="profile-value" id="profTrack">—</span>
+                    <span class="profile-unit">мс/кадр</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-label">Идентификация</span>
+                    <span class="profile-value" id="profIdent">—</span>
+                    <span class="profile-unit">мс/кадр</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-label">Данные + запись</span>
+                    <span class="profile-value" id="profData">—</span>
+                    <span class="profile-unit">мс/кадр</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-label">Время обработки</span>
+                    <span class="profile-value" id="profTotal">—</span>
+                    <span class="profile-unit">сек</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="job-results" id="jobResults" style="display:none">
+        <h3>Результаты</h3>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Имя</th>
+                        <th>Номер</th>
+                        <th>Команда</th>
+                        <th>Время (с)</th>
+                        <th>Дистанция (м)</th>
+                        <th>Ср. скорость (км/ч)</th>
+                        <th>Макс. скорость (км/ч)</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="stats-charts-row" style="margin-top: 1.5rem">
+            <div class="card">
+                <h3 class="card-title">Время на льду</h3>
+                <canvas id="resultTimeChart" height="250"></canvas>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Пройденная дистанция</h3>
+                <canvas id="resultDistChart" height="250"></canvas>
+            </div>
+        </div>
+
+        <div class="job-actions">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Перейти к дашборду</a>
+            <a href="{{ url_for('upload') }}" class="btn btn-secondary">Обработать ещё</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const jobId = "{{ job_id }}";
+let pollInterval;
+
+function teamColor(team) {
+    if (team === 'Home') return '#3b82f6';
+    if (team === 'Away') return '#ef4444';
+    return '#6b7280';
+}
+
+function updateUI(job) {
+    const indicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    const spinner = document.getElementById('spinner');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const framesInfo = document.getElementById('framesInfo');
+    const message = document.getElementById('jobMessage');
+    const card = document.getElementById('jobCard');
+
+    statusText.textContent = {
+        'queued': 'В очереди',
+        'running': 'Обработка',
+        'completed': 'Завершено',
+        'error': 'Ошибка'
+    }[job.status] || job.status;
+
+    progressBar.style.width = job.progress + '%';
+    progressPercent.textContent = job.progress + '%';
+    message.textContent = job.message;
+
+    if (job.total_frames > 0) {
+        framesInfo.textContent = `${job.processed_frames || 0} / ${job.total_frames} кадров`;
+    }
+
+    // Show profiling data
+    if (job.processing_fps || job.profile) {
+        const panel = document.getElementById('jobProfile');
+        panel.style.display = '';
+        if (job.processing_fps) document.getElementById('profFps').textContent = job.processing_fps;
+        if (job.processing_time) document.getElementById('profTotal').textContent = job.processing_time;
+        if (job.profile) {
+            document.getElementById('profTrack').textContent = job.profile.yolo_track_ms;
+            document.getElementById('profIdent').textContent = job.profile.identify_ms;
+            document.getElementById('profData').textContent = job.profile.data_write_ms;
+        }
+    }
+
+    card.className = 'job-status-card job-' + job.status;
+
+    if (job.status === 'review') {
+        clearInterval(pollInterval);
+        window.location.href = '/review/' + jobId;
+        return;
+    } else if (job.status === 'completed') {
+        spinner.style.display = 'none';
+        clearInterval(pollInterval);
+        showResults(job.stats);
+    } else if (job.status === 'error') {
+        spinner.style.display = 'none';
+        clearInterval(pollInterval);
+    }
+}
+
+function showResults(stats) {
+    if (!stats || !stats.length) return;
+    const container = document.getElementById('jobResults');
+    container.style.display = '';
+
+    const tbody = document.getElementById('resultsBody');
+    tbody.innerHTML = '';
+    for (const r of stats) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.Name || '—'}</td>
+            <td>${r.Number != null ? r.Number : '—'}</td>
+            <td><span class="team-badge team-${(r.Team||'').toLowerCase()}">${r.Team || '—'}</span></td>
+            <td>${r['Time (s)']}</td>
+            <td>${r['Distance (m)']}</td>
+            <td>${r['Avg Speed (km/h)'] ?? '—'}</td>
+            <td>${r['Max Speed (km/h)'] ?? '—'}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    const named = stats.filter(r => r.Name).sort((a, b) => b['Time (s)'] - a['Time (s)']);
+
+    new Chart(document.getElementById('resultTimeChart'), {
+        type: 'bar',
+        data: {
+            labels: named.map(p => p.Name),
+            datasets: [{ label: 'Время (с)', data: named.map(p => p['Time (s)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    const distSorted = [...named].sort((a, b) => b['Distance (m)'] - a['Distance (m)']);
+    new Chart(document.getElementById('resultDistChart'), {
+        type: 'bar',
+        data: {
+            labels: distSorted.map(p => p.Name),
+            datasets: [{ label: 'Дистанция (м)', data: distSorted.map(p => p['Distance (m)']), backgroundColor: distSorted.map(p => teamColor(p.Team)) }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+}
+
+async function poll() {
+    try {
+        const resp = await fetch('/api/job/' + jobId);
+        const job = await resp.json();
+        updateUI(job);
+    } catch (e) {
+        console.error('Poll error:', e);
+    }
+}
+
+pollInterval = setInterval(poll, 1500);
+poll();
+</script>
+{% endblock %}

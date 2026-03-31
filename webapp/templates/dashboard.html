@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}Дашборд{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Дашборд</h1>
+    <p class="page-desc">Обзор всех обработанных матчей и статистики игроков</p>
+</div>
+
+<div class="dashboard-summary" id="summary-cards">
+    <div class="summary-card">
+        <div class="summary-value" id="total-datasets">{{ datasets|length }}</div>
+        <div class="summary-label">Датасетов</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-value" id="total-players">—</div>
+        <div class="summary-label">Уникальных игроков</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-value" id="total-records">—</div>
+        <div class="summary-label">Записей</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-value" id="total-distance">—</div>
+        <div class="summary-label">Суммарная дистанция (м)</div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card card-wide">
+        <h3 class="card-title">Датасеты</h3>
+        <div class="dataset-list" id="dataset-list">
+            {% for name, records in datasets.items() %}
+            <div class="dataset-item" data-name="{{ name }}">
+                <div class="dataset-info">
+                    <span class="dataset-name">{{ name }}</span>
+                    <span class="dataset-count">{{ records|length }} записей</span>
+                </div>
+                <button class="btn btn-sm btn-outline" onclick="loadDataset('{{ name }}')">Подробнее</button>
+            </div>
+            {% endfor %}
+            {% if not datasets %}
+            <div class="empty-state">
+                <p>Нет обработанных датасетов. <a href="{{ url_for('upload') }}">Загрузите видео</a> для начала анализа.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 class="card-title">Распределение по командам</h3>
+        <canvas id="teamChart" height="250"></canvas>
+    </div>
+
+    <div class="card">
+        <h3 class="card-title">Топ-10: Время на льду</h3>
+        <canvas id="timeChart" height="250"></canvas>
+    </div>
+
+    <div class="card">
+        <h3 class="card-title">Топ-10: Дистанция</h3>
+        <canvas id="distanceChart" height="250"></canvas>
+    </div>
+</div>
+
+<!-- Dataset detail modal -->
+<div class="modal-overlay" id="datasetModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">Датасет</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="table-wrapper">
+                <table class="data-table" id="modal-table">
+                    <thead>
+                        <tr>
+                            <th>Имя</th>
+                            <th>Номер</th>
+                            <th>Команда</th>
+                            <th>Время (с)</th>
+                            <th>Дистанция (м)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-tbody"></tbody>
+                </table>
+            </div>
+            <div class="modal-charts">
+                <canvas id="modalTimeChart" height="200"></canvas>
+                <canvas id="modalDistChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const allDatasets = {{ datasets|tojson }};
+
+// Compute summary
+let totalRecords = 0, totalDistance = 0, playerNames = new Set();
+for (const [name, records] of Object.entries(allDatasets)) {
+    totalRecords += records.length;
+    for (const r of records) {
+        if (r['Name']) playerNames.add(r['Name']);
+        totalDistance += r['Distance (m)'] || 0;
+    }
+}
+document.getElementById('total-players').textContent = playerNames.size;
+document.getElementById('total-records').textContent = totalRecords;
+document.getElementById('total-distance').textContent = Math.round(totalDistance).toLocaleString();
+
+// Team distribution chart
+const teamCounts = {};
+for (const records of Object.values(allDatasets)) {
+    for (const r of records) {
+        const t = r['Team'] || 'Unknown';
+        teamCounts[t] = (teamCounts[t] || 0) + 1;
+    }
+}
+new Chart(document.getElementById('teamChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(teamCounts),
+        datasets: [{
+            data: Object.values(teamCounts),
+            backgroundColor: ['#3b82f6', '#ef4444', '#6b7280', '#10b981'],
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+
+// Aggregate all players
+function aggregateAll(datasets) {
+    const agg = {};
+    for (const records of Object.values(datasets)) {
+        for (const r of records) {
+            if (!r['Name']) continue;
+            const key = r['Name'] + '_' + (r['Team'] || '');
+            if (!agg[key]) agg[key] = { Name: r['Name'], Team: r['Team'], 'Time (s)': 0, 'Distance (m)': 0, Number: r['Number'] };
+            agg[key]['Time (s)'] += r['Time (s)'] || 0;
+            agg[key]['Distance (m)'] += r['Distance (m)'] || 0;
+            if (r['Number'] && !agg[key].Number) agg[key].Number = r['Number'];
+        }
+    }
+    return Object.values(agg).sort((a, b) => b['Time (s)'] - a['Time (s)']);
+}
+
+const allAgg = aggregateAll(allDatasets);
+const top10Time = allAgg.slice(0, 10);
+const top10Dist = [...allAgg].sort((a, b) => b['Distance (m)'] - a['Distance (m)']).slice(0, 10);
+
+function teamColor(team) {
+    if (team === 'Home') return '#3b82f6';
+    if (team === 'Away') return '#ef4444';
+    return '#6b7280';
+}
+
+new Chart(document.getElementById('timeChart'), {
+    type: 'bar',
+    data: {
+        labels: top10Time.map(p => p.Name),
+        datasets: [{
+            label: 'Время (с)',
+            data: top10Time.map(p => p['Time (s)']),
+            backgroundColor: top10Time.map(p => teamColor(p.Team)),
+        }]
+    },
+    options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { x: { title: { display: true, text: 'Секунды' } } }
+    }
+});
+
+new Chart(document.getElementById('distanceChart'), {
+    type: 'bar',
+    data: {
+        labels: top10Dist.map(p => p.Name),
+        datasets: [{
+            label: 'Дистанция (м)',
+            data: top10Dist.map(p => p['Distance (m)']),
+            backgroundColor: top10Dist.map(p => teamColor(p.Team)),
+        }]
+    },
+    options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { x: { title: { display: true, text: 'Метры' } } }
+    }
+});
+
+// Modal
+let modalCharts = [];
+
+async function loadDataset(name) {
+    const resp = await fetch('/api/dataset/' + encodeURIComponent(name));
+    const data = await resp.json();
+    const modal = document.getElementById('datasetModal');
+    document.getElementById('modal-title').textContent = name;
+
+    const tbody = document.getElementById('modal-tbody');
+    tbody.innerHTML = '';
+    for (const r of data.aggregated) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.Name || '—'}</td>
+            <td>${r.Number != null ? Math.round(r.Number) : '—'}</td>
+            <td><span class="team-badge team-${(r.Team||'').toLowerCase()}">${r.Team || '—'}</span></td>
+            <td>${r['Time (s)']}</td>
+            <td>${r['Distance (m)']}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    // Destroy old charts
+    modalCharts.forEach(c => c.destroy());
+    modalCharts = [];
+
+    const named = data.aggregated.filter(r => r.Name);
+    modalCharts.push(new Chart(document.getElementById('modalTimeChart'), {
+        type: 'bar',
+        data: {
+            labels: named.map(p => p.Name),
+            datasets: [{ label: 'Время (с)', data: named.map(p => p['Time (s)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false }, title: { display: true, text: 'Время на льду' } } }
+    }));
+
+    modalCharts.push(new Chart(document.getElementById('modalDistChart'), {
+        type: 'bar',
+        data: {
+            labels: named.map(p => p.Name),
+            datasets: [{ label: 'Дистанция (м)', data: named.map(p => p['Distance (m)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false }, title: { display: true, text: 'Пройденная дистанция' } } }
+    }));
+
+    modal.classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('datasetModal').classList.remove('active');
+}
+
+document.getElementById('datasetModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

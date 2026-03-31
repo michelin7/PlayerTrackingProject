@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Обработка видео{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Обработка видео</h1>
+    <p class="page-desc">Загрузите видеозапись матча и выберите конфигурацию команд для анализа</p>
+</div>
+
+<div class="upload-container">
+    <form id="uploadForm" class="upload-form" enctype="multipart/form-data">
+        <div class="form-section">
+            <h3>1. Видеофайл</h3>
+            <div class="file-drop-zone" id="videoDropZone">
+                <div class="drop-icon">&#x1F3AC;</div>
+                <p>Перетащите видеофайл сюда или нажмите для выбора</p>
+                <p class="drop-hint">Поддерживаемые форматы: MP4, AVI, MOV, MKV</p>
+                <input type="file" name="video" id="videoInput" accept=".mp4,.avi,.mov,.mkv" required hidden>
+            </div>
+            <div class="file-selected" id="videoSelected" style="display:none">
+                <span class="file-name" id="videoFileName"></span>
+                <button type="button" class="btn btn-sm btn-outline" onclick="clearVideo()">Убрать</button>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>2. Конфигурация команд</h3>
+            <div class="cfg-select-row">
+                <select id="configSelect" class="form-select">
+                    <option value="">-- Загрузка... --</option>
+                </select>
+                <a href="/config" class="btn btn-outline btn-sm" target="_blank">Создать новую</a>
+            </div>
+            <div id="configPreview" class="config-preview-box" style="display:none"></div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                Начать обработку
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="info-section">
+    <h3>Требования</h3>
+    <div class="info-grid">
+        <div class="info-item">
+            <strong>Модели</strong>
+            <p>В папке <code>models/</code> должны находиться: Player_Detection.pt, LinesDetection.pt, NumbersRec.pt</p>
+        </div>
+        <div class="info-item">
+            <strong>Трекер</strong>
+            <p>В папке <code>trackers/</code> должен находиться файл tracker_fast.yaml</p>
+        </div>
+        <div class="info-item">
+            <strong>GPU</strong>
+            <p>Для максимальной производительности рекомендуется NVIDIA GPU с поддержкой CUDA</p>
+        </div>
+        <div class="info-item">
+            <strong>Конфигурация</strong>
+            <p>Создайте конфигурацию с составами команд на странице <a href="/config">Конфигурация</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedConfigData = null;
+
+// Load configs list
+async function loadConfigs() {
+    try {
+        const resp = await fetch('/api/configs');
+        const list = await resp.json();
+        const select = document.getElementById('configSelect');
+        select.innerHTML = '<option value="">-- Выберите конфигурацию --</option>';
+        for (const cfg of list) {
+            const opt = document.createElement('option');
+            opt.value = cfg.id;
+            opt.textContent = cfg.name;
+            select.appendChild(opt);
+        }
+    } catch (e) {
+        console.error('Failed to load configs', e);
+    }
+}
+
+// Config preview on select
+document.getElementById('configSelect').addEventListener('change', async function() {
+    const id = this.value;
+    const preview = document.getElementById('configPreview');
+    if (!id) {
+        preview.style.display = 'none';
+        selectedConfigData = null;
+        return;
+    }
+    try {
+        const resp = await fetch('/api/configs/' + id);
+        const cfg = await resp.json();
+        selectedConfigData = cfg;
+
+        let html = '<div class="config-preview-content">';
+        const homeRoster = cfg.home_team || {};
+        const awayRoster = cfg.away_team || {};
+        const homeColors = (cfg.teams_colors_info?.Home || []).join(', ');
+        const awayColors = (cfg.teams_colors_info?.Away || []).join(', ');
+        const homeCount = Object.keys(homeRoster).length;
+        const awayCount = Object.keys(awayRoster).length;
+
+        html += `<div class="preview-team"><span class="badge badge-home">Home</span> <b>${homeColors}</b> &mdash; ${homeCount} игроков: `;
+        html += Object.entries(homeRoster).map(([n,p]) => `#${n} ${p}`).join(', ');
+        html += '</div>';
+
+        html += `<div class="preview-team"><span class="badge badge-away">Away</span> <b>${awayColors}</b> &mdash; ${awayCount} игроков: `;
+        html += Object.entries(awayRoster).map(([n,p]) => `#${n} ${p}`).join(', ');
+        html += '</div>';
+
+        html += '</div>';
+        preview.innerHTML = html;
+        preview.style.display = '';
+    } catch (e) {
+        preview.innerHTML = '<p class="text-muted">Ошибка загрузки</p>';
+        preview.style.display = '';
+    }
+});
+
+// Drag & drop
+const dropZone = document.getElementById('videoDropZone');
+const videoInput = document.getElementById('videoInput');
+
+dropZone.addEventListener('click', () => videoInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+        videoInput.files = e.dataTransfer.files;
+        showSelectedVideo();
+    }
+});
+videoInput.addEventListener('change', showSelectedVideo);
+
+function showSelectedVideo() {
+    if (videoInput.files.length) {
+        const f = videoInput.files[0];
+        document.getElementById('videoFileName').textContent = `${f.name} (${(f.size/1024/1024).toFixed(1)} MB)`;
+        document.getElementById('videoSelected').style.display = 'flex';
+        dropZone.style.display = 'none';
+    }
+}
+
+function clearVideo() {
+    videoInput.value = '';
+    document.getElementById('videoSelected').style.display = 'none';
+    dropZone.style.display = '';
+}
+
+// Form submit
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+
+    if (!selectedConfigData) {
+        alert('Выберите конфигурацию команд');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Загрузка...';
+
+    const formData = new FormData(this);
+    formData.set('config_json', JSON.stringify(selectedConfigData));
+
+    try {
+        const resp = await fetch('/upload', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.error) {
+            alert(data.error);
+            btn.disabled = false;
+            btn.textContent = 'Начать обработку';
+        } else if (data.redirect) {
+            window.location.href = data.redirect;
+        }
+    } catch (err) {
+        alert('Ошибка: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Начать обработку';
+    }
+});
+
+// Init
+document.addEventListener('DOMContentLoaded', loadConfigs);
+</script>
+{% endblock %}

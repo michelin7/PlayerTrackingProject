@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block title %}Ревизия результатов{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Ревизия результатов</h1>
+    <p class="page-desc">Проверьте автоматическую разметку и исправьте ошибки</p>
+</div>
+
+<!-- Summary bar -->
+<div class="review-summary card" id="summaryCard">
+    <div class="review-summary-items">
+        <div class="summary-item"><span class="summary-num" id="sumGroups">0</span><span class="summary-label">Игроков</span></div>
+        <div class="summary-item"><span class="summary-num" id="sumClips">0</span><span class="summary-label">Клипов</span></div>
+        <div class="summary-item"><span class="summary-num" id="sumUnid">0</span><span class="summary-label">Без ID</span></div>
+        <div class="summary-item summary-approved"><span class="summary-num" id="sumApproved">0</span><span class="summary-label">Подтверждено</span></div>
+        <div class="summary-item summary-rejected"><span class="summary-num" id="sumRejected">0</span><span class="summary-label">Отклонено</span></div>
+        <div class="summary-item summary-reassigned"><span class="summary-num" id="sumReassigned">0</span><span class="summary-label">Переназначено</span></div>
+    </div>
+</div>
+
+<!-- Accuracy report (shown after finalization) -->
+<div class="card accuracy-card" id="accuracyCard" style="display:none">
+    <h3>Результаты ревизии</h3>
+    <div class="accuracy-grid">
+        <div class="accuracy-item"><span class="accuracy-num" id="accCorrect">0</span><span>Верно размечены</span></div>
+        <div class="accuracy-item accuracy-warn"><span class="accuracy-num" id="accCorrected">0</span><span>Исправлены</span></div>
+        <div class="accuracy-item accuracy-bad"><span class="accuracy-num" id="accRejected">0</span><span>Отклонены</span></div>
+        <div class="accuracy-item accuracy-new"><span class="accuracy-num" id="accNew">0</span><span>Назначены вручную</span></div>
+        <div class="accuracy-item accuracy-main"><span class="accuracy-num" id="accPct">—</span><span>Точность авторазметки</span></div>
+    </div>
+    <div class="accuracy-actions">
+        <a href="/upload" class="btn btn-primary">Обработать ещё</a>
+    </div>
+</div>
+
+<!-- Identified groups -->
+<!-- Toast notification -->
+<div class="toast toast-success" id="toast"></div>
+
+<div id="groupsContainer"></div>
+
+<!-- Unidentified -->
+<div id="unidentifiedContainer"></div>
+
+<!-- Bottom action bar -->
+<div class="review-bottom-bar" id="bottomBar">
+    <div class="review-bar-info">
+        <span id="barStatus">Загрузка...</span>
+    </div>
+    <div class="review-bar-actions">
+        <button class="btn btn-secondary" id="btnApproveAll">Подтвердить все</button>
+        <button class="btn btn-secondary" id="btnSave" disabled>Сохранить</button>
+        <button class="btn btn-primary" id="btnFinalize" disabled>Финализировать</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const JOB_ID = "{{ job_id }}";
+const BASE_URL = `/results/${JOB_ID}/player_videos/`;
+
+let manifest = null;
+let decisions = {};        // {cpid: {clips: {tid: {action, ...}}}}
+let unidDecisions = {};    // {tid: {action, target_team, target_number, target_name}}
+let rosterOptions = [];    // [{team, number, name, label}]
+
+// ========== INIT ==========
+async function init() {
+    try {
+        const resp = await fetch(`/api/job/${JOB_ID}/review`);
+        manifest = await resp.json();
+    } catch (e) {
+        document.getElementById('barStatus').textContent = 'Ошибка загрузки данных';
+        return;
+    }
+
+    // Build roster dropdown options
+    rosterOptions = [];
+    for (const [team, players] of Object.entries(manifest.roster || {})) {
+        for (const [num, name] of Object.entries(players)) {
+            rosterOptions.push({team, number: parseInt(num), name, label: `${team} #${num} ${name}`});
+        }
+    }
+    rosterOptions.sort((a, b) => a.team.localeCompare(b.team) || a.number - b.number);
+
+    // Restore saved decisions
+    if (manifest.saved_decisions) {
+        decisions = manifest.saved_decisions.decisions || {};
+        unidDecisions = manifest.saved_decisions.unidentified_decisions || {};
+    }
+
+    renderGroups();
+    renderUnidentified();
+    updateSummary();
+    document.getElementById('btnSave').disabled = false;
+    document.getElementById('btnFinalize').disabled = false;
+    document.getElementById('barStatus').textContent = 'Проверьте клипы и подтвердите или исправьте разметку';
+}
+
+// ========== RENDER GROUPS ==========
+function renderGroups() {
+    const container = document.getElementById('groupsContainer');
+    container.innerHTML = '';
+
+    if (!manifest.groups || !manifest.groups.length) {
+        container.innerHTML = '<div class="card" style="text-align:center;padding:2rem;opacity:.6">Нет идентифицированных игроков</div>';
+        return;
+    }
+
+    for (const group of manifest.groups) {
+        const cpid = String(group.canonical_pid);
+        const team = group.auto_team || 'Unknown';
+        const num = group.auto_number;
+        const name = group.auto_name || '—';
+        const teamClass = team.toLowerCase();
+
+        // Ensure decisions structure
+        if (!decisions[cpid]) decisions[cpid] = {clips: {}};
+
+        const groupEl = document.createElement('div');
+        groupEl.className = 'review-group card';
+        groupEl.id = `group-${cpid}`;
+
+        const clipCount = group.clips.length;
+        const headerHTML = `
+            <div class="review-group-header" onclick="toggleGroup('${cpid}')">
+                <div class="review-group-info">
+                    <span class="team-badge team-${teamClass}">${team}</span>
+                    <span class="review-group-name">#${num != null ? num : '?'} ${name}</span>
+                    <span class="review-group-meta">${clipCount} клип(ов) | TOI: ${group.total_toi}с | Dist: ${group.total_distance}м</span>
+                </div>
+                <span class="review-group-toggle" id="toggle-${cpid}">&#9660;</span>
+            </div>
+        `;
+
+        let clipsHTML = `<div class="review-group-body" id="body-${cpid}" style="display:none">`;
+        for (const clip of group.clips.sort((a, b) => a.track_id - b.track_id)) {
+            const tid = String(clip.track_id);
+            const saved = decisions[cpid].clips[tid] || {};
+            const action = saved.action || '';
+            clipsHTML += renderClip(clip, cpid, tid, action, saved, false);
+        }
+        clipsHTML += '</div>';
+
+        groupEl.innerHTML = headerHTML + clipsHTML;
+        container.appendChild(groupEl);
+    }
+}
+
+function renderUnidentified() {
+    const container = document.getElementById('unidentifiedContainer');
+    container.innerHTML = '';
+
+    const allClips = [];
+    for (const group of (manifest.unidentified || [])) {
+        for (const clip of group.clips) {
+            allClips.push({...clip, cpid: String(group.canonical_pid)});
+        }
+    }
+    if (!allClips.length) return;
+
+    allClips.sort((a, b) => a.track_id - b.track_id);
+
+    let html = '<div class="card review-group"><div class="review-group-header" onclick="toggleGroup(\'unid\')">';
+    html += `<div class="review-group-info"><span class="team-badge" style="background:#6b7280">?</span>`;
+    html += `<span class="review-group-name">Неидентифицированные</span>`;
+    html += `<span class="review-group-meta">${allClips.length} клип(ов)</span></div>`;
+    html += `<span class="review-group-toggle" id="toggle-unid">&#9660;</span></div>`;
+    html += `<div class="review-group-body" id="body-unid" style="display:none">`;
+
+    for (const clip of allClips) {
+        const tid = String(clip.track_id);
+        const saved = unidDecisions[tid] || {};
+        const action = saved.action || '';
+        html += renderClip(clip, clip.cpid, tid, action, saved, true);
+    }
+    html += '</div></div>';
+    container.innerHTML = html;
+}
+
+function renderClip(clip, cpid, tid, action, saved, isUnidentified) {
+    const teamClass = (clip.auto_team || '').toLowerCase();
+    const stateClass = action ? `review-clip-${action === 'assign' ? 'reassigned' : action}` : '';
+
+    let actionsHTML = '';
+    if (isUnidentified) {
+        actionsHTML = `
+            <div class="review-clip-actions">
+                <button class="btn btn-sm ${action === 'assign' ? 'btn-active' : ''}" onclick="setUnidAction('${tid}', 'assign', this)">Назначить</button>
+                <button class="btn btn-sm btn-danger-outline ${action === 'ignore' ? 'btn-active' : ''}" onclick="setUnidAction('${tid}', 'ignore', this)">Игнорировать</button>
+                <div class="review-reassign-row" id="unid-assign-${tid}" style="display:${action === 'assign' ? 'flex' : 'none'}">
+                    ${buildRosterSelect(`unid-sel-${tid}`, saved)}
+                </div>
+            </div>
+        `;
+    } else {
+        actionsHTML = `
+            <div class="review-clip-actions">
+                <button class="btn btn-sm btn-success-outline ${action === 'approve' ? 'btn-active' : ''}" onclick="setClipAction('${cpid}','${tid}','approve',this)">Подтвердить</button>
+                <button class="btn btn-sm btn-danger-outline ${action === 'reject' ? 'btn-active' : ''}" onclick="setClipAction('${cpid}','${tid}','reject',this)">Отклонить</button>
+                <button class="btn btn-sm btn-accent-outline ${action === 'reassign' ? 'btn-active' : ''}" onclick="setClipAction('${cpid}','${tid}','reassign',this)">Переназначить</button>
+                <div class="review-reassign-row" id="reassign-${cpid}-${tid}" style="display:${action === 'reassign' ? 'flex' : 'none'}">
+                    ${buildRosterSelect(`sel-${cpid}-${tid}`, saved)}
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="review-clip ${stateClass}" id="clip-${tid}">
+            <video class="review-clip-video" preload="none" controls src="${BASE_URL}${clip.file}"></video>
+            <div class="review-clip-info">
+                <div class="review-clip-id">Track #${clip.track_id}</div>
+                <div class="review-clip-meta">
+                    <span>TOI: ${clip.toi}с</span>
+                    <span>Dist: ${clip.distance}м</span>
+                    <span>t=${clip.first_seen}с</span>
+                </div>
+                <div class="review-clip-auto">
+                    Авто: <span class="team-badge team-${teamClass}" style="font-size:.7rem;padding:1px 6px">${clip.auto_team || '?'}</span>
+                    #${clip.auto_number != null ? clip.auto_number : '?'} ${clip.auto_name || ''}
+                </div>
+            </div>
+            ${actionsHTML}
+        </div>
+    `;
+}
+
+function buildRosterSelect(id, saved) {
+    let selectedVal = '';
+    if (saved && saved.target_team && saved.target_number != null) {
+        selectedVal = `${saved.target_team}_${saved.target_number}`;
+    }
+    let html = `<select class="review-select" id="${id}" onchange="onRosterSelect('${id}')">`;
+    html += '<option value="">-- Выберите игрока --</option>';
+    let lastTeam = '';
+    for (const opt of rosterOptions) {
+        if (opt.team !== lastTeam) {
+            if (lastTeam) html += '</optgroup>';
+            html += `<optgroup label="${opt.team}">`;
+            lastTeam = opt.team;
+        }
+        const val = `${opt.team}_${opt.number}`;
+        const sel = val === selectedVal ? 'selected' : '';
+        html += `<option value="${val}" ${sel}>${opt.label}</option>`;
+    }
+    if (lastTeam) html += '</optgroup>';
+    html += '</select>';
+    return html;
+}
+
+// ========== ACTIONS ==========
+function toggleGroup(id) {
+    const body = document.getElementById(`body-${id}`);
+    const toggle = document.getElementById(`toggle-${id}`);
+    if (body.style.display === 'none') {
+        body.style.display = '';
+        toggle.innerHTML = '&#9650;';
+        // Trigger lazy load of videos
+        body.querySelectorAll('video[preload="none"]').forEach(v => v.preload = 'metadata');
+    } else {
+        body.style.display = 'none';
+        toggle.innerHTML = '&#9660;';
+    }
+}
+
+function setClipAction(cpid, tid, action, btn) {
+    if (!decisions[cpid]) decisions[cpid] = {clips: {}};
+
+    // Toggle: clicking active button deselects
+    const current = decisions[cpid].clips[tid]?.action;
+    if (current === action) {
+        delete decisions[cpid].clips[tid];
+        updateClipUI(tid, '');
+        updateSummary();
+        return;
+    }
+
+    decisions[cpid].clips[tid] = {action};
+
+    // Show/hide reassign dropdown
+    const row = document.getElementById(`reassign-${cpid}-${tid}`);
+    if (row) row.style.display = action === 'reassign' ? 'flex' : 'none';
+
+    updateClipUI(tid, action);
+    updateSummary();
+}
+
+function setUnidAction(tid, action, btn) {
+    const current = unidDecisions[tid]?.action;
+    if (current === action) {
+        delete unidDecisions[tid];
+        updateClipUI(tid, '');
+        const row = document.getElementById(`unid-assign-${tid}`);
+        if (row) row.style.display = 'none';
+        updateSummary();
+        return;
+    }
+
+    unidDecisions[tid] = {action};
+    const row = document.getElementById(`unid-assign-${tid}`);
+    if (row) row.style.display = action === 'assign' ? 'flex' : 'none';
+
+    updateClipUI(tid, action === 'assign' ? 'reassigned' : action);
+    updateSummary();
+}
+
+function onRosterSelect(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel.value) return;
+    const [team, numStr] = sel.value.split('_');
+    const num = parseInt(numStr);
+    const name = (manifest.roster[team] || {})[numStr] || '';
+
+    // Determine if this is an unidentified or group select
+    if (selectId.startsWith('unid-sel-')) {
+        const tid = selectId.replace('unid-sel-', '');
+        unidDecisions[tid] = {action: 'assign', target_team: team, target_number: num, target_name: name};
+    } else if (selectId.startsWith('sel-')) {
+        const parts = selectId.replace('sel-', '').split('-');
+        const cpid = parts[0];
+        const tid = parts[1];
+        if (!decisions[cpid]) decisions[cpid] = {clips: {}};
+        decisions[cpid].clips[tid] = {action: 'reassign', target_team: team, target_number: num, target_name: name};
+    }
+    updateSummary();
+}
+
+function updateClipUI(tid, action) {
+    const el = document.getElementById(`clip-${tid}`);
+    if (!el) return;
+    el.className = 'review-clip' + (action ? ` review-clip-${action}` : '');
+    // Update button active states
+    el.querySelectorAll('.btn-sm').forEach(b => b.classList.remove('btn-active'));
+    if (action) {
+        const actionMap = {'approve': 0, 'reject': 1, 'reassign': 2, 'assign': 0, 'ignore': 1};
+        const idx = actionMap[action];
+        const btns = el.querySelectorAll('.review-clip-actions > .btn-sm');
+        if (btns[idx]) btns[idx].classList.add('btn-active');
+    }
+}
+
+function updateSummary() {
+    let approved = 0, rejected = 0, reassigned = 0, totalClips = 0, totalUnid = 0;
+
+    for (const group of (manifest.groups || [])) {
+        totalClips += group.clips.length;
+        const cpid = String(group.canonical_pid);
+        for (const clip of group.clips) {
+            const dec = decisions[cpid]?.clips?.[String(clip.track_id)];
+            if (dec) {
+                if (dec.action === 'approve') approved++;
+                else if (dec.action === 'reject') rejected++;
+                else if (dec.action === 'reassign') reassigned++;
+            }
+        }
+    }
+
+    for (const group of (manifest.unidentified || [])) {
+        for (const clip of group.clips) {
+            totalUnid++;
+            const dec = unidDecisions[String(clip.track_id)];
+            if (dec) {
+                if (dec.action === 'assign') reassigned++;
+                else if (dec.action === 'ignore') rejected++;
+            }
+        }
+    }
+
+    document.getElementById('sumGroups').textContent = (manifest.groups || []).length;
+    document.getElementById('sumClips').textContent = totalClips;
+    document.getElementById('sumUnid').textContent = totalUnid;
+    document.getElementById('sumApproved').textContent = approved;
+    document.getElementById('sumRejected').textContent = rejected;
+    document.getElementById('sumReassigned').textContent = reassigned;
+
+    const remaining = totalClips + totalUnid - approved - rejected - reassigned;
+    document.getElementById('barStatus').textContent = remaining > 0
+        ? `Осталось разметить: ${remaining} клип(ов)`
+        : 'Все клипы размечены. Можно финализировать.';
+}
+
+// ========== APPROVE ALL ==========
+document.getElementById('btnApproveAll').onclick = function() {
+    for (const group of (manifest.groups || [])) {
+        const cpid = String(group.canonical_pid);
+        if (!decisions[cpid]) decisions[cpid] = {clips: {}};
+        for (const clip of group.clips) {
+            const tid = String(clip.track_id);
+            if (!decisions[cpid].clips[tid]) {
+                decisions[cpid].clips[tid] = {action: 'approve'};
+                updateClipUI(tid, 'approve');
+            }
+        }
+    }
+    updateSummary();
+};
+
+// ========== SAVE ==========
+document.getElementById('btnSave').onclick = async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Сохранение...';
+    try {
+        await fetch(`/api/job/${JOB_ID}/review`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({decisions, unidentified_decisions: unidDecisions})
+        });
+        btn.textContent = 'Сохранено!';
+        setTimeout(() => { btn.textContent = 'Сохранить'; btn.disabled = false; }, 1500);
+    } catch (e) {
+        btn.textContent = 'Ошибка!';
+        setTimeout(() => { btn.textContent = 'Сохранить'; btn.disabled = false; }, 2000);
+    }
+};
+
+// ========== FINALIZE ==========
+document.getElementById('btnFinalize').onclick = async function() {
+    // Save first
+    await fetch(`/api/job/${JOB_ID}/review`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({decisions, unidentified_decisions: unidDecisions})
+    });
+
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Финализация...';
+    document.getElementById('btnSave').disabled = true;
+
+    try {
+        await fetch(`/api/job/${JOB_ID}/finalize`, {method: 'POST'});
+        // Poll for completion
+        const poll = setInterval(async () => {
+            const resp = await fetch(`/api/job/${JOB_ID}`);
+            const job = await resp.json();
+            if (job.status === 'completed') {
+                clearInterval(poll);
+                showAccuracy(job.accuracy);
+                btn.textContent = 'Готово!';
+            } else if (job.status === 'error') {
+                clearInterval(poll);
+                btn.textContent = 'Ошибка';
+                btn.disabled = false;
+                document.getElementById('btnSave').disabled = false;
+                alert(job.message);
+            } else {
+                btn.textContent = job.message || 'Финализация...';
+            }
+        }, 1500);
+    } catch (e) {
+        btn.textContent = 'Ошибка';
+        btn.disabled = false;
+    }
+};
+
+function showAccuracy(acc) {
+    if (!acc) return;
+    document.getElementById('accCorrect').textContent = acc.correct;
+    document.getElementById('accCorrected').textContent = acc.corrected;
+    document.getElementById('accRejected').textContent = acc.rejected;
+    document.getElementById('accNew').textContent = acc.newly_assigned;
+    document.getElementById('accPct').textContent = acc.accuracy_pct + '%';
+    document.getElementById('accuracyCard').style.display = '';
+    document.getElementById('bottomBar').style.display = 'none';
+    showToast(`Данные сохранены! Точность авторазметки: ${acc.accuracy_pct}%. Excel и видео доступны в разделе Результаты.`);
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast toast-${type} show`;
+    setTimeout(() => { toast.classList.remove('show'); }, 5000);
+}
+
+// ========== START ==========
+init();
+</script>
+{% endblock %}

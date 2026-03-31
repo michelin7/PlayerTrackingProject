@@ -1,0 +1,582 @@
+{% extends "base.html" %}
+{% block title %}Конфигурация{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Конфигурация матча</h1>
+    <p class="page-desc">Создайте или загрузите конфигурацию команд с разбивкой по парам защитников и тройкам нападающих</p>
+</div>
+
+<div class="cfg-wrapper">
+    <!-- Saved configs selector -->
+    <div class="card cfg-saved-card">
+        <div class="cfg-saved-header">
+            <h3 class="card-title">Сохраненные конфигурации</h3>
+            <div class="cfg-saved-actions">
+                <select id="savedConfigSelect" class="form-select">
+                    <option value="">— Новая конфигурация —</option>
+                </select>
+                <button type="button" class="btn btn-outline btn-sm" onclick="loadSelectedConfig()">Загрузить</button>
+                <button type="button" class="btn btn-outline btn-sm btn-danger-outline" onclick="deleteSelectedConfig()">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config name -->
+    <div class="card">
+        <div class="form-group">
+            <label>Название конфигурации</label>
+            <input type="text" id="configName" class="form-input" placeholder="Например: Динамо vs Локомотив 2025-03-15">
+        </div>
+    </div>
+
+    <!-- Two-column team editor -->
+    <div class="cfg-teams-grid">
+        <!-- HOME TEAM -->
+        <div class="card cfg-team-card">
+            <div class="cfg-team-header cfg-home">
+                <h3>Home</h3>
+                <div class="form-group form-group-inline">
+                    <label>Вратарь(и) #</label>
+                    <input type="text" id="homeGoalies" class="form-input form-input-sm" placeholder="31, 35">
+                </div>
+            </div>
+            <div class="cfg-color-picker-section">
+                <label class="cfg-color-label">Основной цвет формы</label>
+                <div class="cfg-color-swatches" id="homePrimaryColor"></div>
+                <label class="cfg-color-label" style="margin-top:0.5rem">Дополнительный цвет (необязательно)</label>
+                <div class="cfg-color-swatches" id="homeSecondaryColor"></div>
+            </div>
+
+            <!-- Defense pairs -->
+            <div class="cfg-section">
+                <div class="cfg-section-header">
+                    <h4>Защитники (пары)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addPair('home')">+ Пара</button>
+                </div>
+                <div id="homeDefPairs" class="cfg-pairs-container">
+                    <!-- Filled dynamically -->
+                </div>
+            </div>
+
+            <!-- Forward lines -->
+            <div class="cfg-section">
+                <div class="cfg-section-header">
+                    <h4>Нападающие (тройки)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addLine('home')">+ Тройка</button>
+                </div>
+                <div id="homeFwdLines" class="cfg-lines-container">
+                    <!-- Filled dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- AWAY TEAM -->
+        <div class="card cfg-team-card">
+            <div class="cfg-team-header cfg-away">
+                <h3>Away</h3>
+                <div class="form-group form-group-inline">
+                    <label>Вратарь(и) #</label>
+                    <input type="text" id="awayGoalies" class="form-input form-input-sm" placeholder="30, 33">
+                </div>
+            </div>
+            <div class="cfg-color-picker-section">
+                <label class="cfg-color-label">Основной цвет формы</label>
+                <div class="cfg-color-swatches" id="awayPrimaryColor"></div>
+                <label class="cfg-color-label" style="margin-top:0.5rem">Дополнительный цвет (необязательно)</label>
+                <div class="cfg-color-swatches" id="awaySecondaryColor"></div>
+            </div>
+
+            <!-- Defense pairs -->
+            <div class="cfg-section">
+                <div class="cfg-section-header">
+                    <h4>Защитники (пары)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addPair('away')">+ Пара</button>
+                </div>
+                <div id="awayDefPairs" class="cfg-pairs-container">
+                    <!-- Filled dynamically -->
+                </div>
+            </div>
+
+            <!-- Forward lines -->
+            <div class="cfg-section">
+                <div class="cfg-section-header">
+                    <h4>Нападающие (тройки)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addLine('away')">+ Тройка</button>
+                </div>
+                <div id="awayFwdLines" class="cfg-lines-container">
+                    <!-- Filled dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="cfg-bottom-bar">
+        <div class="cfg-summary" id="cfgSummary"></div>
+        <div class="cfg-actions">
+            <button type="button" class="btn btn-primary btn-lg" id="saveConfigBtn" onclick="saveConfig()">Сохранить конфигурацию</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MAX_DEF_PAIRS = 4;
+const MAX_FWD_LINES = 4;
+
+let pairCounters = { home: 0, away: 0 };
+let lineCounters = { home: 0, away: 0 };
+let editingConfigId = null;  // tracks which config is being edited
+
+// ========== Color palette ==========
+const COLOR_PALETTE = [
+    { name: 'red',     rgb: [255, 0, 0],     css: '#ef4444',  textColor: '#fff' },
+    { name: 'blue',    rgb: [0, 0, 255],     css: '#2563eb',  textColor: '#fff' },
+    { name: 'white',   rgb: [255, 255, 255], css: '#ffffff',  textColor: '#333' },
+    { name: 'black',   rgb: [0, 0, 0],       css: '#1e293b',  textColor: '#fff' },
+    { name: 'green',   rgb: [0, 255, 0],     css: '#22c55e',  textColor: '#fff' },
+    { name: 'yellow',  rgb: [255, 255, 0],   css: '#eab308',  textColor: '#333' },
+    { name: 'orange',  rgb: [255, 165, 0],   css: '#f97316',  textColor: '#fff' },
+    { name: 'cyan',    rgb: [0, 255, 255],   css: '#06b6d4',  textColor: '#fff' },
+    { name: 'magenta', rgb: [255, 0, 255],   css: '#d946ef',  textColor: '#fff' },
+    { name: 'purple',  rgb: [128, 0, 128],   css: '#7c3aed',  textColor: '#fff' },
+    { name: 'gray',    rgb: [128, 128, 128], css: '#9ca3af',  textColor: '#fff' },
+    { name: 'brown',   rgb: [165, 42, 42],   css: '#92400e',  textColor: '#fff' },
+];
+
+function initColorSwatches(primaryId, secondaryId, defaultPrimary, defaultSecondary) {
+    for (const [containerId, defaultColor] of [[primaryId, defaultPrimary], [secondaryId, defaultSecondary]]) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        // Add "none" option for secondary
+        if (containerId === secondaryId) {
+            const none = document.createElement('button');
+            none.type = 'button';
+            none.className = 'cfg-swatch cfg-swatch-none' + (!defaultColor ? ' selected' : '');
+            none.dataset.color = '';
+            none.innerHTML = `<span class="cfg-swatch-check">&#10003;</span><span class="cfg-swatch-name">нет</span>`;
+            none.addEventListener('click', () => {
+                container.querySelectorAll('.cfg-swatch').forEach(s => s.classList.remove('selected'));
+                none.classList.add('selected');
+            });
+            container.appendChild(none);
+        }
+        for (const color of COLOR_PALETTE) {
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
+            swatch.className = 'cfg-swatch';
+            if (defaultColor === color.name) swatch.classList.add('selected');
+            swatch.style.setProperty('--swatch-bg', color.css);
+            swatch.style.setProperty('--swatch-text', color.textColor);
+            swatch.dataset.color = color.name;
+            swatch.innerHTML = `<span class="cfg-swatch-check">&#10003;</span><span class="cfg-swatch-name">${color.name}</span>`;
+            swatch.addEventListener('click', () => {
+                container.querySelectorAll('.cfg-swatch').forEach(s => s.classList.remove('selected'));
+                swatch.classList.add('selected');
+            });
+            container.appendChild(swatch);
+        }
+    }
+}
+
+function getSelectedColors(primaryId, secondaryId) {
+    const colors = [];
+    const prim = document.getElementById(primaryId).querySelector('.cfg-swatch.selected');
+    if (prim && prim.dataset.color) colors.push(prim.dataset.color);
+    const sec = document.getElementById(secondaryId).querySelector('.cfg-swatch.selected');
+    if (sec && sec.dataset.color) colors.push(sec.dataset.color);
+    return colors;
+}
+
+function setSelectedColor(containerId, color) {
+    const container = document.getElementById(containerId);
+    container.querySelectorAll('.cfg-swatch').forEach(s => {
+        if (!color && s.dataset.color === '') {
+            s.classList.add('selected');
+        } else {
+            s.classList.toggle('selected', s.dataset.color === color);
+        }
+    });
+}
+
+// ========== Pair / Line templates ==========
+
+function createPlayerInput(num, name) {
+    return `<div class="cfg-player-input">
+        <input type="text" class="form-input form-input-num" placeholder="#" value="${num || ''}" maxlength="2">
+        <input type="text" class="form-input form-input-name" placeholder="Фамилия Имя" value="${name || ''}">
+    </div>`;
+}
+
+function addPair(side, p1Num, p1Name, p2Num, p2Name) {
+    const container = document.getElementById(side + 'DefPairs');
+    const count = container.querySelectorAll('.cfg-pair').length;
+    if (count >= MAX_DEF_PAIRS) {
+        showToast('Максимум ' + MAX_DEF_PAIRS + ' пары защитников', 'warning');
+        return;
+    }
+    pairCounters[side]++;
+    const idx = pairCounters[side];
+    const div = document.createElement('div');
+    div.className = 'cfg-pair';
+    div.innerHTML = `
+        <div class="cfg-pair-header">
+            <span class="cfg-pair-label">Пара ${count + 1}</span>
+            <button type="button" class="btn-icon btn-remove" onclick="this.closest('.cfg-pair').remove(); renumber('${side}')" title="Удалить">&times;</button>
+        </div>
+        <div class="cfg-pair-players">
+            ${createPlayerInput(p1Num, p1Name)}
+            ${createPlayerInput(p2Num, p2Name)}
+        </div>
+    `;
+    container.appendChild(div);
+    updateSummary();
+}
+
+function addLine(side, p1Num, p1Name, p2Num, p2Name, p3Num, p3Name) {
+    const container = document.getElementById(side + 'FwdLines');
+    const count = container.querySelectorAll('.cfg-line').length;
+    if (count >= MAX_FWD_LINES) {
+        showToast('Максимум ' + MAX_FWD_LINES + ' тройки нападающих', 'warning');
+        return;
+    }
+    lineCounters[side]++;
+    const div = document.createElement('div');
+    div.className = 'cfg-line';
+    div.innerHTML = `
+        <div class="cfg-pair-header">
+            <span class="cfg-pair-label">Тройка ${count + 1}</span>
+            <button type="button" class="btn-icon btn-remove" onclick="this.closest('.cfg-line').remove(); renumber('${side}')" title="Удалить">&times;</button>
+        </div>
+        <div class="cfg-line-players">
+            ${createPlayerInput(p1Num, p1Name)}
+            ${createPlayerInput(p2Num, p2Name)}
+            ${createPlayerInput(p3Num, p3Name)}
+        </div>
+    `;
+    container.appendChild(div);
+    updateSummary();
+}
+
+function renumber(side) {
+    // Re-label pairs
+    const pairs = document.querySelectorAll(`#${side}DefPairs .cfg-pair`);
+    pairs.forEach((p, i) => {
+        p.querySelector('.cfg-pair-label').textContent = 'Пара ' + (i + 1);
+    });
+    // Re-label lines
+    const lines = document.querySelectorAll(`#${side}FwdLines .cfg-line`);
+    lines.forEach((l, i) => {
+        l.querySelector('.cfg-pair-label').textContent = 'Тройка ' + (i + 1);
+    });
+    updateSummary();
+}
+
+// ========== Collect data ==========
+
+function collectTeam(side) {
+    const roster = {};
+    const defPairs = [];
+    const fwdLines = [];
+
+    // Defense pairs
+    document.querySelectorAll(`#${side}DefPairs .cfg-pair`).forEach(pair => {
+        const inputs = pair.querySelectorAll('.cfg-player-input');
+        const pairPlayers = [];
+        inputs.forEach(pi => {
+            const num = pi.querySelector('.form-input-num').value.trim();
+            const name = pi.querySelector('.form-input-name').value.trim();
+            if (num && name) {
+                roster[num] = name;
+                pairPlayers.push(parseInt(num));
+            }
+        });
+        if (pairPlayers.length > 0) defPairs.push(pairPlayers);
+    });
+
+    // Forward lines
+    document.querySelectorAll(`#${side}FwdLines .cfg-line`).forEach(line => {
+        const inputs = line.querySelectorAll('.cfg-player-input');
+        const linePlayers = [];
+        inputs.forEach(pi => {
+            const num = pi.querySelector('.form-input-num').value.trim();
+            const name = pi.querySelector('.form-input-name').value.trim();
+            if (num && name) {
+                roster[num] = name;
+                linePlayers.push(parseInt(num));
+            }
+        });
+        if (linePlayers.length > 0) fwdLines.push(linePlayers);
+    });
+
+    return { roster, defPairs, fwdLines };
+}
+
+function buildConfig() {
+    const homeColorArr = getSelectedColors('homePrimaryColor', 'homeSecondaryColor');
+    const awayColorArr = getSelectedColors('awayPrimaryColor', 'awaySecondaryColor');
+    const homeGoalies = document.getElementById('homeGoalies').value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    const awayGoalies = document.getElementById('awayGoalies').value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+
+    const home = collectTeam('home');
+    const away = collectTeam('away');
+
+    // basic_colors from selected color names
+    const basicColors = {};
+    for (const c of [...homeColorArr, ...awayColorArr]) {
+        const pal = COLOR_PALETTE.find(p => p.name === c);
+        if (pal) basicColors[c] = pal.rgb;
+    }
+
+    return {
+        config_name: document.getElementById('configName').value.trim() || 'Unnamed',
+        teams_colors_info: { Home: homeColorArr, Away: awayColorArr },
+        basic_colors: basicColors,
+        home_team: home.roster,
+        away_team: away.roster,
+        home_defense_pairs: home.defPairs,
+        home_forward_lines: home.fwdLines,
+        away_defense_pairs: away.defPairs,
+        away_forward_lines: away.fwdLines,
+        goalies_home: homeGoalies,
+        goalies_away: awayGoalies,
+    };
+}
+
+// ========== Summary ==========
+
+function updateSummary() {
+    const home = collectTeam('home');
+    const away = collectTeam('away');
+    const homeCount = Object.keys(home.roster).length;
+    const awayCount = Object.keys(away.roster).length;
+    const el = document.getElementById('cfgSummary');
+    el.innerHTML = `Home: ${home.defPairs.length} пар + ${home.fwdLines.length} троек = <b>${homeCount}</b> игроков &nbsp;|&nbsp; Away: ${away.defPairs.length} пар + ${away.fwdLines.length} троек = <b>${awayCount}</b> игроков`;
+}
+
+// ========== Save / Load ==========
+
+async function saveConfig() {
+    const config = buildConfig();
+    if (!config.config_name || config.config_name === 'Unnamed') {
+        showToast('Укажите название конфигурации', 'warning');
+        document.getElementById('configName').focus();
+        return;
+    }
+    const hColors = config.teams_colors_info.Home;
+    const aColors = config.teams_colors_info.Away;
+    if (hColors.length === 0 || aColors.length === 0) {
+        showToast('Выберите основной цвет формы для обеих команд', 'warning');
+        return;
+    }
+    if (hColors[0] === aColors[0]) {
+        showToast('Основные цвета команд не должны совпадать', 'warning');
+        return;
+    }
+    if (Object.keys(config.home_team).length === 0 && Object.keys(config.away_team).length === 0) {
+        showToast('Добавьте хотя бы одного игрока', 'warning');
+        return;
+    }
+
+    try {
+        let url, method;
+        if (editingConfigId && !editingConfigId.startsWith('legacy__')) {
+            // Update existing config
+            url = '/api/configs/' + editingConfigId;
+            method = 'PUT';
+        } else {
+            // Create new config
+            url = '/api/configs';
+            method = 'POST';
+        }
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        });
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            editingConfigId = data.id;
+            showToast('Конфигурация сохранена', 'success');
+            loadConfigList().then(() => {
+                document.getElementById('savedConfigSelect').value = editingConfigId;
+            });
+            updateSaveButton();
+        } else {
+            showToast('Ошибка: ' + (data.error || 'unknown'), 'danger');
+        }
+    } catch (e) {
+        showToast('Ошибка: ' + e.message, 'danger');
+    }
+}
+
+function updateSaveButton() {
+    const btn = document.getElementById('saveConfigBtn');
+    if (editingConfigId && !editingConfigId.startsWith('legacy__')) {
+        btn.textContent = 'Сохранить изменения';
+    } else {
+        btn.textContent = 'Сохранить конфигурацию';
+    }
+}
+
+async function loadConfigList() {
+    try {
+        const resp = await fetch('/api/configs');
+        const list = await resp.json();
+        const select = document.getElementById('savedConfigSelect');
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- Новая конфигурация --</option>';
+        for (const cfg of list) {
+            const opt = document.createElement('option');
+            opt.value = cfg.id;
+            opt.textContent = cfg.name || cfg.id;
+            select.appendChild(opt);
+        }
+        if (currentVal) select.value = currentVal;
+    } catch (e) {
+        console.error('Failed to load configs', e);
+    }
+}
+
+async function loadSelectedConfig() {
+    const id = document.getElementById('savedConfigSelect').value;
+    if (!id) {
+        clearForm();
+        return;
+    }
+    try {
+        const resp = await fetch('/api/configs/' + id);
+        const cfg = await resp.json();
+        editingConfigId = id;
+        populateForm(cfg);
+        updateSaveButton();
+        showToast('Конфигурация загружена для редактирования', 'success');
+    } catch (e) {
+        showToast('Ошибка загрузки: ' + e.message, 'danger');
+    }
+}
+
+async function deleteSelectedConfig() {
+    const id = document.getElementById('savedConfigSelect').value;
+    if (!id) return;
+    if (!confirm('Удалить эту конфигурацию?')) return;
+    try {
+        const resp = await fetch('/api/configs/' + id, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            showToast('Конфигурация удалена', 'success');
+            clearForm();
+            loadConfigList();
+        }
+    } catch (e) {
+        showToast('Ошибка: ' + e.message, 'danger');
+    }
+}
+
+function clearForm() {
+    editingConfigId = null;
+    updateSaveButton();
+    document.getElementById('configName').value = '';
+    setSelectedColor('homePrimaryColor', 'blue');
+    setSelectedColor('homeSecondaryColor', '');
+    setSelectedColor('awayPrimaryColor', 'white');
+    setSelectedColor('awaySecondaryColor', '');
+    document.getElementById('homeGoalies').value = '';
+    document.getElementById('awayGoalies').value = '';
+    ['homeDefPairs', 'homeFwdLines', 'awayDefPairs', 'awayFwdLines'].forEach(id => {
+        document.getElementById(id).innerHTML = '';
+    });
+    pairCounters = { home: 0, away: 0 };
+    lineCounters = { home: 0, away: 0 };
+    // Add default empty pair + line for each side
+    addPair('home'); addLine('home');
+    addPair('away'); addLine('away');
+    updateSummary();
+}
+
+function populateForm(cfg) {
+    document.getElementById('configName').value = cfg.config_name || '';
+    const homeC = cfg.teams_colors_info?.Home || ['blue'];
+    const awayC = cfg.teams_colors_info?.Away || ['white'];
+    const hArr = Array.isArray(homeC) ? homeC : [homeC];
+    const aArr = Array.isArray(awayC) ? awayC : [awayC];
+    setSelectedColor('homePrimaryColor', hArr[0] || 'blue');
+    setSelectedColor('homeSecondaryColor', hArr[1] || '');
+    setSelectedColor('awayPrimaryColor', aArr[0] || 'white');
+    setSelectedColor('awaySecondaryColor', aArr[1] || '');
+    document.getElementById('homeGoalies').value = (cfg.goalies_home || []).join(', ');
+    document.getElementById('awayGoalies').value = (cfg.goalies_away || []).join(', ');
+
+    // Clear existing
+    ['homeDefPairs', 'homeFwdLines', 'awayDefPairs', 'awayFwdLines'].forEach(id => {
+        document.getElementById(id).innerHTML = '';
+    });
+    pairCounters = { home: 0, away: 0 };
+    lineCounters = { home: 0, away: 0 };
+
+    const homeRoster = cfg.home_team || {};
+    const awayRoster = cfg.away_team || {};
+
+    // Populate defense pairs
+    function populatePairs(side, pairs, roster) {
+        if (!pairs || pairs.length === 0) { addPair(side); return; }
+        for (const pair of pairs) {
+            const nums = pair.map(String);
+            const p1 = nums[0] || '';
+            const p2 = nums[1] || '';
+            addPair(side, p1, roster[p1] || '', p2, roster[p2] || '');
+        }
+    }
+
+    function populateLines(side, lines, roster) {
+        if (!lines || lines.length === 0) { addLine(side); return; }
+        for (const line of lines) {
+            const nums = line.map(String);
+            addLine(side, nums[0] || '', roster[nums[0]] || '', nums[1] || '', roster[nums[1]] || '', nums[2] || '', roster[nums[2]] || '');
+        }
+    }
+
+    populatePairs('home', cfg.home_defense_pairs, homeRoster);
+    populateLines('home', cfg.home_forward_lines, homeRoster);
+    populatePairs('away', cfg.away_defense_pairs, awayRoster);
+    populateLines('away', cfg.away_forward_lines, awayRoster);
+
+    updateSummary();
+}
+
+// ========== Toast ==========
+
+function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast toast-' + (type || 'success');
+    // Trigger reflow then add .show for CSS transition
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => { toast.classList.remove('show'); }, 3000);
+}
+
+// ========== Init ==========
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Init color swatches with defaults
+    initColorSwatches('homePrimaryColor', 'homeSecondaryColor', 'blue', '');
+    initColorSwatches('awayPrimaryColor', 'awaySecondaryColor', 'white', '');
+    loadConfigList();
+    // Start with one empty pair and line per side
+    addPair('home'); addLine('home');
+    addPair('away'); addLine('away');
+    updateSummary();
+    // Listen for input changes to update summary
+    document.addEventListener('input', (e) => {
+        if (e.target.closest('.cfg-team-card')) updateSummary();
+    });
+});
+</script>
+{% endblock %}

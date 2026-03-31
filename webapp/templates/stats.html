@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Статистика игроков</h1>
+    <p class="page-desc">Агрегированные данные по всем обработанным матчам</p>
+</div>
+
+<div class="stats-controls">
+    <div class="filter-group">
+        <label>Датасет:</label>
+        <select id="datasetFilter" class="form-select">
+            <option value="all">Все датасеты</option>
+            {% for name in datasets.keys() %}
+            <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Команда:</label>
+        <select id="teamFilter" class="form-select">
+            <option value="all">Все</option>
+            <option value="Home">Home</option>
+            <option value="Away">Away</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Поиск:</label>
+        <input type="text" id="nameSearch" class="form-input" placeholder="Имя игрока...">
+    </div>
+    <div class="filter-group">
+        <label>Сортировка:</label>
+        <select id="sortBy" class="form-select">
+            <option value="time">По времени на льду</option>
+            <option value="distance">По дистанции</option>
+            <option value="name">По имени</option>
+        </select>
+    </div>
+</div>
+
+<div class="stats-charts-row">
+    <div class="card">
+        <h3 class="card-title">Время на льду (топ-15)</h3>
+        <canvas id="timeBarChart" height="300"></canvas>
+    </div>
+    <div class="card">
+        <h3 class="card-title">Дистанция vs Время</h3>
+        <canvas id="scatterChart" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card card-wide">
+    <h3 class="card-title">Таблица игроков <span id="playerCount" class="badge"></span></h3>
+    <div class="table-wrapper">
+        <table class="data-table" id="statsTable">
+            <thead>
+                <tr>
+                    <th class="sortable" data-sort="name">Имя</th>
+                    <th>Номер</th>
+                    <th>Команда</th>
+                    <th class="sortable" data-sort="time">Время (с)</th>
+                    <th class="sortable" data-sort="distance">Дистанция (м)</th>
+                    <th>Скорость (м/с)</th>
+                </tr>
+            </thead>
+            <tbody id="statsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="stats-charts-row">
+    <div class="card">
+        <h3 class="card-title">Распределение времени на льду</h3>
+        <canvas id="timeHistChart" height="250"></canvas>
+    </div>
+    <div class="card">
+        <h3 class="card-title">Средняя скорость по командам</h3>
+        <canvas id="speedTeamChart" height="250"></canvas>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const allAggregated = {{ aggregated|tojson }};
+const perDataset = {{ per_dataset|tojson }};
+let charts = [];
+
+function destroyCharts() {
+    charts.forEach(c => c.destroy());
+    charts = [];
+}
+
+function getFiltered() {
+    const ds = document.getElementById('datasetFilter').value;
+    const team = document.getElementById('teamFilter').value;
+    const search = document.getElementById('nameSearch').value.toLowerCase();
+    const sortBy = document.getElementById('sortBy').value;
+
+    let data = ds === 'all' ? [...allAggregated] : [...(perDataset[ds] || [])];
+
+    if (team !== 'all') data = data.filter(r => r.Team === team);
+    if (search) data = data.filter(r => (r.Name || '').toLowerCase().includes(search));
+
+    if (sortBy === 'time') data.sort((a, b) => b['Time (s)'] - a['Time (s)']);
+    else if (sortBy === 'distance') data.sort((a, b) => b['Distance (m)'] - a['Distance (m)']);
+    else if (sortBy === 'name') data.sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
+
+    return data;
+}
+
+function teamColor(team) {
+    if (team === 'Home') return '#3b82f6';
+    if (team === 'Away') return '#ef4444';
+    return '#6b7280';
+}
+
+function teamColorAlpha(team, a) {
+    if (team === 'Home') return `rgba(59,130,246,${a})`;
+    if (team === 'Away') return `rgba(239,68,68,${a})`;
+    return `rgba(107,114,128,${a})`;
+}
+
+function render() {
+    const data = getFiltered();
+    destroyCharts();
+
+    // Table
+    const tbody = document.getElementById('statsBody');
+    tbody.innerHTML = '';
+    for (const r of data) {
+        const speed = r['Time (s)'] > 0 ? (r['Distance (m)'] / r['Time (s)']).toFixed(2) : '—';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="player-name">${r.Name || '—'}</td>
+            <td>${r.Number != null ? Math.round(r.Number) : '—'}</td>
+            <td><span class="team-badge team-${(r.Team||'').toLowerCase()}">${r.Team || '—'}</span></td>
+            <td>${r['Time (s)']}</td>
+            <td>${r['Distance (m)']}</td>
+            <td>${speed}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+    document.getElementById('playerCount').textContent = data.length + ' игроков';
+
+    // Time bar chart (top 15)
+    const top15 = data.slice(0, 15);
+    charts.push(new Chart(document.getElementById('timeBarChart'), {
+        type: 'bar',
+        data: {
+            labels: top15.map(p => p.Name || 'N/A'),
+            datasets: [{
+                label: 'Время (с)',
+                data: top15.map(p => p['Time (s)']),
+                backgroundColor: top15.map(p => teamColor(p.Team)),
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { title: { display: true, text: 'Секунды' } } }
+        }
+    }));
+
+    // Scatter chart
+    const scatterData = data.filter(r => r['Time (s)'] > 0).map(r => ({
+        x: r['Time (s)'], y: r['Distance (m)'],
+        label: r.Name, team: r.Team
+    }));
+    charts.push(new Chart(document.getElementById('scatterChart'), {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Home',
+                    data: scatterData.filter(d => d.team === 'Home').map(d => ({ x: d.x, y: d.y })),
+                    backgroundColor: 'rgba(59,130,246,0.7)',
+                    pointRadius: 6,
+                },
+                {
+                    label: 'Away',
+                    data: scatterData.filter(d => d.team === 'Away').map(d => ({ x: d.x, y: d.y })),
+                    backgroundColor: 'rgba(239,68,68,0.7)',
+                    pointRadius: 6,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                x: { title: { display: true, text: 'Время (с)' } },
+                y: { title: { display: true, text: 'Дистанция (м)' } }
+            }
+        }
+    }));
+
+    // Time distribution histogram
+    const bins = [0, 10, 20, 30, 40, 50, 60, 80, 100, 150, 300];
+    const binLabels = bins.slice(0, -1).map((b, i) => `${b}-${bins[i+1]}`);
+    const binCounts = new Array(bins.length - 1).fill(0);
+    for (const r of data) {
+        const t = r['Time (s)'];
+        for (let i = 0; i < bins.length - 1; i++) {
+            if (t >= bins[i] && t < bins[i+1]) { binCounts[i]++; break; }
+        }
+    }
+    charts.push(new Chart(document.getElementById('timeHistChart'), {
+        type: 'bar',
+        data: {
+            labels: binLabels,
+            datasets: [{ label: 'Кол-во игроков', data: binCounts, backgroundColor: '#8b5cf6' }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { title: { display: true, text: 'Время на льду (с)' } },
+                y: { title: { display: true, text: 'Игроков' } }
+            }
+        }
+    }));
+
+    // Speed by team
+    const teamSpeeds = {};
+    for (const r of data) {
+        if (r['Time (s)'] <= 0) continue;
+        const t = r.Team || 'Unknown';
+        if (!teamSpeeds[t]) teamSpeeds[t] = [];
+        teamSpeeds[t].push(r['Distance (m)'] / r['Time (s)']);
+    }
+    const teamLabels = Object.keys(teamSpeeds);
+    const avgSpeeds = teamLabels.map(t => {
+        const s = teamSpeeds[t];
+        return (s.reduce((a, b) => a + b, 0) / s.length).toFixed(2);
+    });
+    charts.push(new Chart(document.getElementById('speedTeamChart'), {
+        type: 'bar',
+        data: {
+            labels: teamLabels,
+            datasets: [{ label: 'Средняя скорость (м/с)', data: avgSpeeds, backgroundColor: teamLabels.map(t => teamColor(t)) }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { title: { display: true, text: 'м/с' } } }
+        }
+    }));
+}
+
+// Event listeners
+['datasetFilter', 'teamFilter', 'sortBy'].forEach(id => {
+    document.getElementById(id).addEventListener('change', render);
+});
+document.getElementById('nameSearch').addEventListener('input', render);
+
+render();
+</script>
+{% endblock %}

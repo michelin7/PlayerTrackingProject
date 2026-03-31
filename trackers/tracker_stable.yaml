@@ -1,0 +1,19 @@
+# BoT-SORT optimized for hockey: minimal ID switches
+# ReID enabled for appearance-based re-identification after occlusions
+
+tracker_type: botsort
+
+# Association thresholds
+track_high_thresh: 0.45       # slightly lower than default to catch more detections in 1st pass
+track_low_thresh: 0.15        # catch low-conf detections in 2nd pass
+new_track_thresh: 0.7         # high: harder to create new track = fewer fragments
+track_buffer: 90              # 3 seconds @ 30fps: keep lost tracks much longer
+match_thresh: 0.85            # IoU matching threshold
+fuse_score: True
+
+# BoT-SORT: appearance + motion
+gmc_method: sparseOptFlow     # global motion compensation for camera movement
+proximity_thresh: 0.5         # spatial proximity filter
+appearance_thresh: 0.25       # lower = stricter appearance matching (fewer wrong re-IDs)
+with_reid: True               # critical for re-identification after occlusion
+model: auto
