@@ -2,6 +2,10 @@
 models/*.pt
 models/*.onnx
 models/*.mlpackage/
+# ...except the two the app ships with (needed to build the installers)
+!models/Player_Detection.pt
+!models/NumbersRec.pt
+!models/Player_Detection.mlpackage/
 
 # ===== Videos & media =====
 *.mp4
