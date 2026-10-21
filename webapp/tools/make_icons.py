@@ -1,4 +1,4 @@
-"""Render the app icon (.icns for macOS, .ico for Windows) from the PS&F wordmark."""
+"""Render the app icon (.icns for macOS, .ico for Windows) from the Player Tracking mark."""
 import subprocess
 import sys
 from pathlib import Path
@@ -17,10 +17,10 @@ def render(size):
     d.rounded_rectangle([0, 0, size - 1, size - 1], radius=r, fill=BG,
                         outline="#313B45", width=max(1, size // 128))
     try:
-        font = ImageFont.truetype(FONT, int(size * 0.30))
+        font = ImageFont.truetype(FONT, int(size * 0.42))
     except OSError:
         font = ImageFont.load_default()
-    d.text((size / 2, size * 0.47), "PS&F", font=font, fill=FG, anchor="mm")
+    d.text((size / 2, size * 0.46), "PT", font=font, fill=FG, anchor="mm")
     d.rectangle([size * 0.28, size * 0.68, size * 0.72, size * 0.71], fill=FG)
     return img
 

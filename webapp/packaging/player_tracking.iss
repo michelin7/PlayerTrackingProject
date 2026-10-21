@@ -1,21 +1,21 @@
-; Inno Setup script for PS&F (Windows).
+; Inno Setup script for Player Tracking (Windows).
 ; Per-user install: no admin password, no UAC prompt, fewer clicks.
-#define AppName "Player Scouting & Fitness"
+#define AppName "Player Tracking"
 #define AppVer  "1.0.0"
 
 [Setup]
 AppName={#AppName}
 AppVersion={#AppVer}
 AppPublisher=SUSU
-DefaultDirName={localappdata}\Programs\PSF
-DefaultGroupName=PS&&F
+DefaultDirName={localappdata}\Programs\PlayerTracking
+DefaultGroupName=Player Tracking
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 OutputDir=..\dist
-OutputBaseFilename=PSF-Setup
+OutputBaseFilename=PlayerTracking-Setup
 SetupIconFile=icon.ico
-UninstallDisplayIcon={app}\PSF.exe
+UninstallDisplayIcon={app}\PlayerTracking.exe
 Compression=lzma2/max
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -26,18 +26,18 @@ WizardStyle=modern
 Name: "en"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "..\dist\PSF\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\PlayerTracking\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: not WebView2Installed
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\PSF.exe"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\PSF.exe"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\PlayerTracking.exe"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\PlayerTracking.exe"
 
 [Run]
 ; The window is WebView2; without the runtime the app would open blank.
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; \
     StatusMsg: "Installing the Microsoft WebView2 runtime..."; Check: not WebView2Installed
-Filename: "{app}\PSF.exe"; Description: "Launch {#AppName}"; \
+Filename: "{app}\PlayerTracking.exe"; Description: "Launch {#AppName}"; \
     Flags: nowait postinstall skipifsilent
 
 [Code]

@@ -22,7 +22,7 @@ def main():
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
 
-    d.text((W / 2, 46), "Player Scouting & Fitness", font=font(BOLD, 26), fill=FG, anchor="mm")
+    d.text((W / 2, 46), "Player Tracking", font=font(BOLD, 26), fill=FG, anchor="mm")
     d.text((W / 2, 78), "Drag the icon into the Applications folder",
            font=font(REG, 15), fill=MUTED, anchor="mm")
 
@@ -33,7 +33,7 @@ def main():
     d.rounded_rectangle([40, 300, W - 40, H - 36], radius=8, fill=CARD, outline="#313B45")
     d.text((70, 330), "First launch \u2014 once only", font=font(BOLD, 17), fill=ORANGE)
     steps = [
-        "1.  Open Applications and double-click PS&F",
+        "1.  Open Applications and double-click Player Tracking",
         "2.  macOS says it cannot verify the developer \u2014 click Done",
         "3.  Open System Settings \u2192 Privacy & Security",
         "4.  Scroll down, click \u201cOpen Anyway\u201d, then \u201cOpen\u201d",

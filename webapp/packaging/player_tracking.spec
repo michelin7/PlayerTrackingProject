@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for PS&F. Build from webapp/: pyinstaller packaging/psf.spec"""
+"""PyInstaller spec for Player Tracking.
+Build from webapp/: pyinstaller packaging/player_tracking.spec"""
 import platform
 import sys
 from pathlib import Path
@@ -54,16 +55,16 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="PSF",
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="PlayerTracking",
           console=False, icon=str(APP / "packaging" /
                                   ("icon.icns" if sys.platform == "darwin" else "icon.ico")))
 
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="PSF")
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="PlayerTracking")
 
 if sys.platform == "darwin":
-    app = BUNDLE(coll, name="Player Scouting & Fitness.app",
+    app = BUNDLE(coll, name="Player Tracking.app",
                  icon=str(APP / "packaging" / "icon.icns"),
-                 bundle_identifier="ru.susu.psf",
+                 bundle_identifier="ru.susu.playertracking",
                  info_plist={
                      "CFBundleShortVersionString": "1.0.0",
                      "NSHighResolutionCapable": True,

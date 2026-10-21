@@ -1,4 +1,4 @@
-"""Desktop entry point for PS&F.
+"""Desktop entry point for Player Tracking.
 
 Serves the Flask app on a loopback port and shows it in a native window, so the
 user never sees a terminal, a URL or a port. Importing `app` drags in torch and
@@ -13,7 +13,7 @@ import sys
 import threading
 import traceback
 
-TITLE = "Player Scouting & Fitness"
+TITLE = "Player Tracking"
 
 LOADING_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><style>
@@ -26,7 +26,7 @@ LOADING_HTML = """<!doctype html>
          animation:slide 1.1s infinite ease-in-out}
   @keyframes slide{0%{transform:translateX(-60px)}100%{transform:translateX(180px)}}
 </style></head>
-<body><div><div class="mark">PS&amp;F</div><div class="bar"><i></i></div></div></body></html>"""
+<body><div><div class="mark">PT</div><div class="bar"><i></i></div></div></body></html>"""
 
 
 def free_port():

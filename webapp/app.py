@@ -29,10 +29,10 @@ BASE_DIR = Path(__file__).resolve().parent
 
 def user_data_dir():
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "PSF"
+        return Path.home() / "Library" / "Application Support" / "PlayerTracking"
     if sys.platform == "win32":
-        return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "PSF"
-    return Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share")) / "PSF"
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "PlayerTracking"
+    return Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share")) / "PlayerTracking"
 
 
 DATA_DIR = user_data_dir() if FROZEN else BASE_DIR

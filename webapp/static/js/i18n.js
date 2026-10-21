@@ -10,7 +10,7 @@ const I18N = {
         nav_dataset: "Датасет",
         nav_live: "Живой контроль",
         nav_analysis: "Анализ видео",
-        footer_title: "Player Scouting & Fitness — Система видеоаналитики хоккейных матчей",
+        footer_title: "Player Tracking — Система видеоаналитики хоккейных матчей",
         footer_sub: "YOLO + BoT-SORT + CoreML | Медведев М.Д. | Магистерская диссертация 2025",
 
         // ---- status line of a running job (sent by the server as a key) ----
@@ -126,7 +126,7 @@ const I18N = {
         live_cancel: "Отмена",
 
         // ============ Index (landing) ============
-        hero_title: "Player Scouting & Fitness",
+        hero_title: "Player Tracking",
         hero_subtitle: "Полуавтоматическая система видеоаналитики хоккейных матчей: индивидуальный скаутинг игроков и учёт игрового времени по трансляционному видео, без дорогостоящих датчиков",
         feat_scouting_title: "Скаутинг по видео",
         feat_scouting_desc: "Автоматическая нарезка видео по каждому игроку с объединением смежных фрагментов — для индивидуального анализа действий на льду",
@@ -607,11 +607,11 @@ const I18N = {
         live_edit_player: "Click to fix or remove",
         live_remove_player: "Remove player",
         live_cancel: "Cancel",
-        footer_title: "Player Scouting & Fitness — Ice Hockey Video Analytics System",
+        footer_title: "Player Tracking — Ice Hockey Video Analytics System",
         footer_sub: "YOLO + BoT-SORT + CoreML | M. Medvedev | Master's thesis 2025",
 
         // ============ Index (landing) ============
-        hero_title: "Player Scouting & Fitness",
+        hero_title: "Player Tracking",
         hero_subtitle: "Semi-automated ice hockey video analytics: individual player scouting and ice-time tracking from broadcast footage — no expensive wearable sensors required",
         feat_scouting_title: "Video Scouting",
         feat_scouting_desc: "Automatic per-player video clips with adjacent-fragment merging for individual on-ice performance review",
@@ -1020,7 +1020,7 @@ const I18N = {
         const h = document.querySelector(".page-header h1[data-i18n], h1[data-i18n]");
         if (h && dict[h.getAttribute("data-i18n")] !== undefined) {
             const heading = dict[h.getAttribute("data-i18n")];
-            const suffix = "Player Scouting & Fitness";
+            const suffix = "Player Tracking";
             document.title = heading === suffix ? suffix : `${heading} — ${suffix}`;
         }
 

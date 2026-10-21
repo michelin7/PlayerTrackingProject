@@ -1,10 +1,10 @@
-# Player Scouting & Fitness (PS&F)
+# Player Tracking
 
 Semi-automated ice hockey video analytics system for individual player scouting and fitness assessment — powered by computer vision, no wearable sensors required.
 
 ## Overview
 
-PS&F extracts per-player video clips and physical performance metrics (TOI, distance, average and maximum skating speed) from standard broadcast hockey footage. It replaces expensive GPS/LPS tracking hardware with a camera-based pipeline: YOLO detection, ByteTrack tracking, jersey color classification, number recognition, and a human-in-the-loop review step.
+Player Tracking extracts per-player video clips and physical performance metrics (TOI, distance, average and maximum skating speed) from standard broadcast hockey footage. It replaces expensive GPS/LPS tracking hardware with a camera-based pipeline: YOLO detection, ByteTrack tracking, jersey color classification, number recognition, and a human-in-the-loop review step.
 
 ## Key Features
 
@@ -92,10 +92,10 @@ Intel means the Intel build.
 
 | Mac | File |
 | --- | --- |
-| Apple Silicon (M1-M4) | `PSF-macOS-arm64.dmg` |
-| Intel | `PSF-macOS-intel.dmg` |
+| Apple Silicon (M1-M4) | `PlayerTracking-macOS-arm64.dmg` |
+| Intel | `PlayerTracking-macOS-intel.dmg` |
 
-1. Open the DMG and drag **Player Scouting & Fitness** into **Applications**.
+1. Open the DMG and drag **Player Tracking** into **Applications**.
 2. Open **Applications** and double-click the app. macOS says it cannot verify the
    developer — click **Done**.
 3. Open **System Settings → Privacy & Security**, scroll to the bottom and click
@@ -105,11 +105,11 @@ From then on the app starts with a normal double-click.
 
 ### Windows 10 / 11
 
-1. Run `PSF-Setup.exe`. Windows SmartScreen may warn about an unknown publisher —
+1. Run `PlayerTracking-Setup.exe`. Windows SmartScreen may warn about an unknown publisher —
    click **More info → Run anyway**.
 2. Click through the installer. No administrator password is needed: the app
    installs for the current user only.
-3. Start **Player Scouting & Fitness** from the Start menu or the desktop shortcut.
+3. Start **Player Tracking** from the Start menu or the desktop shortcut.
 
 The installer adds the Microsoft WebView2 runtime if it is missing, which the app
 uses to draw its window.
@@ -125,8 +125,8 @@ them entirely — useful when handing the app to a club.
 Videos, results, and team configurations are stored outside the app, so updating
 or reinstalling it never touches them:
 
-- macOS — `~/Library/Application Support/PSF`
-- Windows — `%LOCALAPPDATA%\PSF`
+- macOS — `~/Library/Application Support/PlayerTracking`
+- Windows — `%LOCALAPPDATA%\PlayerTracking`
 
 ## Setup (from source)
 

@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PS&F{% endblock %} — Player Scouting & Fitness</title>
+    <!-- i18n.js rewrites this to "<heading> — Player Tracking" once the
+         language is known; this is only the pre-script fallback. -->
+    <title>{% block title %}Player Tracking{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,7 +44,7 @@
             <span class="menu-bar"></span><span class="menu-bar"></span><span class="menu-bar"></span>
         </button>
         <a href="{{ url_for('index') }}" class="nav-logo">
-            <span class="logo-mark">PS&amp;F</span>
+            <span class="logo-mark">Player Tracking</span>
         </a>
         <div class="topbar-right">
             <button class="lang-toggle" id="langToggle" title="Switch language">RU</button>
@@ -88,7 +90,7 @@
 
         <footer class="footer">
             <div class="footer-content">
-                <p data-i18n="footer_title">Player Scouting &amp; Fitness &mdash; Система видеоаналитики хоккейных матчей</p>
+                <p data-i18n="footer_title">Player Tracking &mdash; Система видеоаналитики хоккейных матчей</p>
                 <p class="footer-sub" data-i18n="footer_sub">YOLO + BoT-SORT + CoreML | M. Medvedev | Master's thesis 2025</p>
             </div>
         </footer>
