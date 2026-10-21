@@ -211,8 +211,11 @@ cd webapp
 python app.py
 ```
 
-App starts at **http://localhost:5050**. `python launcher.py` instead opens the
-same app in a desktop window, the way the installed build runs.
+App starts at **http://localhost:5050**.
+
+`python launcher.py` instead opens the same app in a desktop window, the way the
+installed build runs; that path additionally needs `pip install pywebview`, which
+`requirements.txt` leaves out so a headless install stays free of GUI packages.
 
 ### 5. (Optional) re-export the CoreML model
 

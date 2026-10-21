@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 import app
 
+HERE = Path(__file__).resolve().parent
+
 
 def _yaml(path):
     out = {}
@@ -48,7 +50,7 @@ def test_live_never_blocks_on_a_question():
     # tracker stopped, the panel froze, and a session could sit there forever.
     # Live asks about a lost track by queueing it and pausing playback, never by
     # blocking the loop — so no trigger set, no ask gate, no "asking" status.
-    src = Path("live.py").read_text()
+    src = (HERE / "live.py").read_text()
     for gone in ("_trigger", "self.triggers", '"asking"', "_answered.wait"):
         assert gone not in src, f"blocking question machinery is back: {gone}"
     assert "def _check_lost" in src and "self.pending" in src
@@ -57,10 +59,10 @@ def test_live_never_blocks_on_a_question():
 def test_detection_call_parameters_match():
     # conf / max_det / imgsz are what decide which players exist at all.
     import re
-    src = Path("app.py").read_text()
+    src = (HERE / "app.py").read_text()
     calls = re.findall(r"model_det\.track\((.*?)\)", src, re.S)
     live_call = re.search(r"self\.model_det\.track\((.*?)\)",
-                          Path("live.py").read_text(), re.S).group(1)
+                          (HERE / "live.py").read_text(), re.S).group(1)
     assert calls, "no batch track() call found"
     for key in ("conf=0.6", "max_det=16", "persist=True"):
         assert key in calls[0].replace(" ", "").replace("\n", "") or key in calls[0], (key, calls[0])
