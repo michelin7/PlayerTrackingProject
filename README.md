@@ -138,8 +138,8 @@ or reinstalling it never touches them:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/player-scouting-fitness.git
-cd player-scouting-fitness
+git clone https://github.com/michelin7/PlayerTrackingProject.git
+cd PlayerTrackingProject
 ```
 
 ### 2. Install dependencies
