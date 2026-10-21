@@ -45,7 +45,10 @@ jobs:
         with: { python-version: "3.10" }
       - run: pip install -r webapp/requirements.txt pywebview pyinstaller
       - name: WebView2 bootstrapper
-        run: curl -L -o webapp/packaging/MicrosoftEdgeWebview2Setup.exe https://go.microsoft.com/fwlink/p/?LinkId=2124703
+        run: curl -L -o webapp/packaging/MicrosoftEdgeWebview2Setup.exe "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+      - name: Inno Setup
+        # Not part of the runner image: it ships WiX and Chocolatey only.
+        run: choco install innosetup -y --no-progress
       - run: |
           cd webapp
           python tools/make_icons.py
@@ -57,8 +60,23 @@ jobs:
       - name: installer
         run: |
           cd webapp/packaging
-          & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" player_tracking.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" player_tracking.iss
       - uses: actions/upload-artifact@v4
         with:
           name: PlayerTracking-Windows
           path: webapp/dist/PlayerTracking-Setup.exe
+
+  # A tag run also publishes the three installers as a Release: Actions
+  # artifacts expire after 90 days and are invisible to anyone not signed in.
+  release:
+    needs: [macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - run: gh release create "$GITHUB_REF_NAME" artifacts/*/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

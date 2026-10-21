@@ -32,7 +32,14 @@ for mod in ("ultralytics.trackers", "ultralytics.nn", "ultralytics.models",
             "ultralytics.utils"):
     hiddenimports += collect_submodules(mod)
 
-for pkg in ("torch", "torchvision"):
+# pywebview draws its window through pythonnet on Windows, and the CLR
+# runtime files do not come along with a plain import scan.
+packages = ["torch", "torchvision"]
+if sys.platform == "win32":
+    packages.append("pythonnet")
+    hiddenimports += ["clr"]
+
+for pkg in packages:
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
