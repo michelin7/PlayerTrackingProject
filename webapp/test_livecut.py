@@ -5,7 +5,6 @@ Run: python3 test_livecut.py"""
 import json, os, tempfile, types
 from pathlib import Path
 from threading import Lock
-import live
 from live import LiveSession
 
 

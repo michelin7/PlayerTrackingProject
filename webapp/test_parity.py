@@ -4,7 +4,6 @@ asserted here instead of being trusted. Run: python3 test_parity.py"""
 import tempfile
 from pathlib import Path
 import app
-import live
 
 
 def _yaml(path):

@@ -3,12 +3,10 @@ import json
 import math
 import time
 import hashlib
-import random
-import signal
 import sys
 import shutil
-from threading import Lock, Thread, Event
-from collections import defaultdict, namedtuple, Counter, deque
+from threading import Thread, Event
+from collections import defaultdict, Counter, deque
 from pathlib import Path
 
 import cv2
@@ -143,7 +141,7 @@ def load_stats_from_excel(path):
                 if isinstance(v, float) and math.isnan(v):
                     r[k] = None
         return records
-    except Exception as e:
+    except Exception:
         return []
 
 
@@ -1798,7 +1796,6 @@ def process_video_job(job_id, video_path, config_data):
         # DET_STRIDE: full identification every Nth frame (saves ~10ms on non-ID frames).
         # All frames are processed through YOLO tracker for tracking continuity.
         # CoreML on Apple Neural Engine provides ~2x speedup over MPS PyTorch.
-        FRAME_SKIP = 1    # process every (downsampled-to-30fps) frame
         DET_STRIDE = 1    # identify on EVERY frame (video is already 30fps) for accuracy
         DET_IMGSZ = 640   # full resolution
         clip_fps = fps     # output clips at the effective (30) fps
@@ -1864,7 +1861,6 @@ def process_video_job(job_id, video_path, config_data):
         set_msg(job, "job_m_processing", "Обработка видео...")
         t_start = time.time()
 
-        last_detections = []    # cached detections from last YOLO run
         last_id_results = {}    # cached identification results
         overlay_frames = []     # [t, [[clip id, x1, y1, x2, y2], ...]] per frame
         overlay_wh = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280,
@@ -2878,7 +2874,6 @@ def finalize_job(job_id):
             decisions = json.load(f)
 
         fps = manifest.get("fps", 25)
-        roster = manifest.get("roster", {})
         group_decisions = decisions.get("decisions", {})
         unid_decisions = decisions.get("unidentified_decisions", {})
         splits = decisions.get("splits", {})            # manual mid-clip cuts
@@ -2907,7 +2902,6 @@ def finalize_job(job_id):
         total_reviewed = 0
 
         # Process identified groups
-        all_groups = manifest.get("groups", []) + manifest.get("unidentified", [])
         for group in manifest.get("groups", []):
             cpid = str(group["canonical_pid"])
             grp_team = group["auto_team"]

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import traceback
+from pathlib import Path
 
 TITLE = "Player Tracking"
 
@@ -126,8 +127,6 @@ def selftest():
 
 def main():
     if "--selftest" in sys.argv:
-        from pathlib import Path
-        globals()["Path"] = Path
         try:
             return selftest()
         except Exception:
