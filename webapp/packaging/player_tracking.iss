@@ -1,7 +1,10 @@
 ; Inno Setup script for Player Tracking (Windows).
 ; Per-user install: no admin password, no UAC prompt, fewer clicks.
 #define AppName "Player Tracking"
-#define AppVer  "1.0.0"
+; CI passes /DAppVer=<tag>; the fallback below marks a local build.
+#ifndef AppVer
+  #define AppVer "0.0.0"
+#endif
 
 [Setup]
 AppName={#AppName}

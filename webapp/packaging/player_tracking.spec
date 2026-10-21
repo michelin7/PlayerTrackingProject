@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec for Player Tracking.
 Build from webapp/: pyinstaller packaging/player_tracking.spec"""
+import os
 import platform
 import sys
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 APP = Path(SPECPATH).resolve().parent          # webapp/
+# CI sets this from the git tag; a local build is not a release.
+VERSION = os.environ.get("PT_VERSION", "0.0.0")
 ROOT = APP.parent                              # project root
 
 datas = [
@@ -73,7 +76,8 @@ if sys.platform == "darwin":
                  icon=str(APP / "packaging" / "icon.icns"),
                  bundle_identifier="ru.susu.playertracking",
                  info_plist={
-                     "CFBundleShortVersionString": "1.0.0",
+                     "CFBundleShortVersionString": VERSION,
+                     "CFBundleVersion": VERSION,
                      "NSHighResolutionCapable": True,
                      "LSMinimumSystemVersion": "11.0",
                      "NSCameraUsageDescription": "",
