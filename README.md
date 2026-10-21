@@ -1,23 +1,57 @@
 # Player Tracking
 
-Semi-automated ice hockey video analytics system for individual player scouting and fitness assessment — powered by computer vision, no wearable sensors required.
+Semi-automated ice hockey video analytics: per-player video clips and time on ice
+from ordinary broadcast footage, with a human verifying the machine's work. No
+wearable sensors.
 
 ## Overview
 
-Player Tracking extracts per-player video clips and physical performance metrics (TOI, distance, average and maximum skating speed) from standard broadcast hockey footage. It replaces expensive GPS/LPS tracking hardware with a camera-based pipeline: YOLO detection, ByteTrack tracking, jersey color classification, number recognition, and a human-in-the-loop review step.
+Player Tracking turns a period of hockey video into per-player clips and a
+time-on-ice report. A YOLO detector and a BoT-SORT tracker follow every skater,
+team and jersey number are read from the picture, and the operator verifies the
+result — either live while the video plays, or afterwards in a review page.
+
+It replaces GPS/LPS vests for the scouting and ice-time part of the job. It does
+not measure distance or skating speed; see [Not implemented](#not-implemented).
 
 ## Key Features
 
-- **Video Scouting** — automatic per-player clip generation for individual on-ice review at original video quality and frame rate
-- **Fitness Metrics** — distance covered, average and maximum skating speed (km/h) calculated after the human review step
-- **No Sensors Needed** — works from any broadcast-quality video feed without GPS/LPS hardware
-- **Team Classification** — HSV pixel-affinity scoring with dual jersey colors (primary + secondary) and adaptive ice-surface filtering
-- **Number Recognition** — YOLO-based OCR with confusion-aware voting (e.g. #7 vs #47) and forward-line/D-pair context disambiguation
-- **Track Integrity** — ByteTrack cross-team jump detection with virtual PID splitting; 3-pass TrackMerger for fragmented tracks
-- **Perspective-Corrected Speed** — per-frame speed scaled by vertical position in frame (near/far side of rink); physically capped at 46.8 km/h; smoothed over a 0.5 s sliding window
-- **Semi-Automated Review** — the system labels, the human verifies and corrects; auto-labeling accuracy is measured per session
-- **Profiling Dashboard** — per-phase timing (YOLO track / identification / data+write) visible on the job status page
-- **Bilingual UI** — Russian / English interface with localStorage language preference
+- **Two working modes** — *live control*, where the operator corrects labels as
+  the video plays, and *automate*, a batch pre-pass followed by review. Both end
+  in the same review page and produce the same results
+- **Video Scouting** — per-player clips at the source resolution and frame rate
+- **Time on Ice** — per-player TOI and a shift timeline, derived from the tracks
+  the operator confirmed
+- **Team Classification** — by jersey brightness: hockey requires one light and
+  one dark team, so a torso crop's median brightness is split against two online
+  cluster centres that adapt as the game goes on. Steadier than matching hues,
+  which drift with arena lighting and broadcast colour grading
+- **Number Recognition** — YOLO digit detection on every frame, voted over the
+  whole track, constrained to the configured roster and to one player per number;
+  forward-line and D-pair context resolves the ambiguous reads
+- **Track Integrity** — a number-change guard and a kinematic guard (a box
+  jumping more than two of its own heights in one frame is the tracker leaping to
+  another player) split contaminated tracks; a two-pass merger reassembles
+  fragments of the same player
+- **Review on the video itself** — the whole match with tracks drawn over it:
+  reassign a track to another player, cut it where the tracker jumped, drop it.
+  Numbers are picked from the roster, never typed
+- **Accuracy Report** — every session measures how much of the automatic
+  labelling survived review
+- **Bilingual UI** — Russian / English, remembered per browser
+- **Desktop app** — ships as a macOS DMG and a Windows installer; no Python on
+  the user's machine
+
+## Not implemented
+
+- **Distance and skating speed.** Both need the rink calibrated to real-world
+  metres, which needs rink-line detection wired into the pipeline. The Excel
+  report therefore carries `Name`, `Number`, `Team`, `Time (s)` and nothing else.
+  A `LinesDetection.pt` model exists from earlier work but is not used by any
+  code path.
+- **Cross-team swap splitting** is implemented but switched off by default
+  (`PlayerIdentifier.TEAM_SPLIT`): the splits it produced cost more review time
+  than the swaps they fixed.
 
 ## Processing Pipeline
 
@@ -25,56 +59,67 @@ Player Tracking extracts per-player video clips and physical performance metrics
 Configuration → Detection & Tracking → Identification → Review → Results
 ```
 
-1. **Configuration** — team rosters, jersey colors (primary + secondary), D-pairs (up to 4×2), forward lines (up to 4×3), goalie numbers
-2. **Detection & Tracking** — YOLO model accelerated via CoreML on Apple Neural Engine + ByteTrack (IoU-only, no ReID); all frames processed for full-quality clips
-3. **Identification** — team classification by jersey color affinity; YOLO number OCR every 3rd frame with cache; line-mate context for ambiguous numbers
-4. **Review** — per-clip approve / reject / reassign; unidentified tracks can be manually assigned
-5. **Results** — TOI, distance, avg/max speed (km/h), merged per-player video clips, Excel report, accuracy report
+1. **Configuration** — rosters, which team wears the light jersey, D-pairs
+   (up to 4×2), forward lines (up to 4×3), goalie numbers
+2. **Detection & Tracking** — YOLO on every frame, CoreML on the Apple Neural
+   Engine where available; BoT-SORT with appearance ReID and camera-motion
+   compensation, so a track survives a pan or a short occlusion
+3. **Identification** — team from torso brightness; the jersey number read every
+   frame and decided by weighted voting over the track rather than per frame
+4. **Review** — reassign, cut or drop tracks on the video itself; unidentified
+   tracks can be given a number from the roster
+5. **Results** — merged per-player clips, TOI, shift timeline, Excel report,
+   accuracy report
 
 ## Tech Stack
 
 | Component | Technology |
 |---|---|
-| Backend | Flask 3.x (Python 3.10+) |
-| Detection | YOLOv8 — custom trained `Player_Detection.pt` |
-| Line Calibration | YOLOv8 — `LinesDetection.pt` (rink line segmentation) |
-| Number OCR | YOLOv8 — `NumbersRec.pt` |
-| Tracking | ByteTrack (`tracker_fast.yaml`, IoU-only, no ReID) |
-| Inference acceleration | CoreML / Apple Neural Engine (primary), MPS, CUDA |
-| Speed estimation | Perspective-corrected pixels-to-meters, 0.5 s sliding window, hard cap 13 m/s |
-| Video writing | Async background thread, original FPS, H.264 |
+| Backend | Flask 3.x (Python 3.10) |
+| Desktop shell | pywebview window + PyInstaller bundle |
+| Detection | YOLO — custom trained `Player_Detection.pt` |
+| Number OCR | YOLO — `NumbersRec.pt` |
+| Tracking | BoT-SORT with ReID and GMC (`trackers/tracker_stable.yaml`) |
+| Team classification | Jersey brightness against two online EMA cluster centres |
+| Inference acceleration | CoreML / Apple Neural Engine, MPS, CUDA, CPU fallback |
+| Video writing | OpenCV H.264 (`avc1`), background writer thread |
 | Frontend | Vanilla JS + CSS + Chart.js; `i18n.js` for RU/EN |
 
 ## Project Structure
 
 ```
 ├── webapp/
-│   ├── app.py                  # Main Flask application (~2200 lines)
-│   ├── requirements.txt        # Python dependencies
+│   ├── app.py                  # Flask application: pipeline, review, results
+│   ├── live.py                 # Live-control session (decode, draw, edit, save)
+│   ├── launcher.py             # Desktop entry point: native window + --selftest
+│   ├── requirements.txt
+│   ├── packaging/              # PyInstaller spec, Inno Setup script, DMG assets
+│   ├── tools/                  # Icon and DMG-background generators, JS tests
+│   ├── test_*.py               # 75 unit tests (plain pytest, no fixtures)
 │   ├── static/
-│   │   ├── css/style.css       # UI styles (light theme)
-│   │   └── js/
-│   │       ├── app.js          # Common helpers
-│   │       └── i18n.js         # RU/EN translation strings + toggle logic
+│   │   ├── css/style.css
+│   │   └── js/{app.js, i18n.js}
 │   └── templates/
-│       ├── base.html           # Base layout: navbar, language toggle, footer
-│       ├── index.html          # Landing page (features, pipeline, model status)
-│       ├── config.html         # Team configuration editor (rosters, colors, lines)
-│       ├── upload.html         # Video upload + config selection with roster preview
-│       ├── job.html            # Processing status, progress bar, profiling metrics
-│       ├── review.html         # Per-clip review interface
-│       ├── results_list.html   # Processed jobs list
-│       ├── dashboard.html      # Per-dataset statistics dashboard
-│       └── stats.html          # Aggregated stats across sessions
-├── models/                     # YOLO model weights (not in repo — see Setup)
-│   ├── Player_Detection.pt     # ~21 MB
-│   ├── LinesDetection.pt       # ~19 MB
-│   └── NumbersRec.pt           # ~21 MB
+│       ├── base.html           # Layout: navbar, language toggle, footer
+│       ├── index.html          # Landing page
+│       ├── config.html         # Team configuration editor
+│       ├── analysis.html       # Video analysis start page (live / automate)
+│       ├── job.html            # Processing status and profiling
+│       ├── review_live.html    # Review: tracks drawn over the whole video
+│       ├── result.html         # One finished session
+│       ├── results.html        # Session list
+│       ├── dashboard.html      # Per-dataset statistics
+│       ├── dataset.html        # Training-data staging
+│       └── stats.html          # Aggregated statistics
+├── models/
+│   ├── Player_Detection.pt     # 21 MB — in the repository
+│   ├── Player_Detection.mlpackage  # 21 MB — CoreML export, macOS
+│   └── NumbersRec.pt           # 19 MB — in the repository
 ├── trackers/
-│   ├── tracker_fast.yaml       # ByteTrack, IoU-only (used by default)
-│   ├── tracker.yaml            # ByteTrack with ReID
-│   └── tracker_stable.yaml     # Conservative thresholds variant
-├── requirements.txt
+│   ├── tracker_stable.yaml     # BoT-SORT + ReID (used by default)
+│   ├── tracker_fast.yaml       # Looser thresholds
+│   └── tracker.yaml            # Fallback
+├── .github/workflows/build.yml # Builds the installers on a tag
 └── README.md
 ```
 
@@ -148,17 +193,16 @@ cd PlayerTrackingProject
 pip install -r webapp/requirements.txt
 ```
 
-### 3. Place models
+### 3. Models
 
-Download the three YOLO model files and put them in the `models/` directory:
+The two models the app loads are tracked in this repository, so a clone has
+everything it needs:
 
 | File | Description | Size |
 |---|---|---|
-| `Player_Detection.pt` | Player detection model | ~21 MB |
-| `LinesDetection.pt` | Rink line segmentation for calibration | ~19 MB |
-| `NumbersRec.pt` | Jersey number recognition (OCR) | ~21 MB |
-
-> Models are not included in the repository due to file size. Contact the author or train custom models using [Ultralytics YOLOv8](https://docs.ultralytics.com/).
+| `Player_Detection.pt` | Player detection | 21 MB |
+| `NumbersRec.pt` | Jersey number recognition | 19 MB |
+| `Player_Detection.mlpackage` | CoreML export of the detector, used on Apple Silicon | 21 MB |
 
 ### 4. Run
 
@@ -167,43 +211,64 @@ cd webapp
 python app.py
 ```
 
-App starts at **http://localhost:5050**.
+App starts at **http://localhost:5050**. `python launcher.py` instead opens the
+same app in a desktop window, the way the installed build runs.
 
-### 5. (Optional) CoreML acceleration on Apple Silicon
+### 5. (Optional) re-export the CoreML model
 
-The app automatically detects and uses a pre-exported CoreML model (`Player_Detection.mlpackage`) if present. To export it:
+The detector is loaded from `Player_Detection.mlpackage` whenever the app runs
+on MPS, and that export is already in the repository. To rebuild it:
 
 ```bash
 pip install coremltools>=9.0
 python -c "from ultralytics import YOLO; YOLO('models/Player_Detection.pt').export(format='coreml', imgsz=640, nms=False)"
 ```
 
-This gives ~2× inference speedup on the Neural Engine (~24 ms/frame vs ~53 ms on MPS).
-
 ## Usage
 
-1. **Create a configuration** — `/config`: set team names, rosters, jersey colors, D-pairs, forward lines, goalie numbers; save for reuse
-2. **Upload video** — `/upload`: select a saved config, upload a game period video (any length)
-3. **Monitor processing** — the job page shows progress, FPS, and per-phase timing breakdown
-4. **Review** — approve, reject, or reassign each automatically labeled clip; manually assign unidentified tracks
-5. **Finalize** — generates merged per-player videos, Excel stats, and an accuracy report
+1. **Create a configuration** — `/config`: team names, rosters, jersey colours,
+   D-pairs, forward lines, goalie numbers. Saved for reuse
+2. **Start the analysis** — `/analysis`: pick the video and the configuration.
+   The checkbox chooses the mode: *live control* corrects labels while the video
+   plays, unchecked runs the batch pre-pass first
+3. **Review** — the whole video with the tracks drawn over it. Reassign a track
+   to another player, cut it where the tracker jumped to someone else, or drop
+   it. Numbers come from the configured roster
+4. **Finalize** — merged per-player videos, the Excel report and the accuracy
+   report are written out
 
 ## Performance
 
-| Metric | Value |
+Measured on an **Apple M3** with the CoreML detector, on a 112-second 1080p clip
+at 25 fps (2800 frames), reading the jersey number on every frame:
+
+| Phase | Time |
 |---|---|
-| Processing speed — Apple M3, CoreML | ~30 FPS |
-| Processing speed — Apple M3, MPS (PyTorch) | ~14 FPS |
-| YOLO track time — CoreML | ~24 ms/frame |
-| YOLO track time — MPS | ~53 ms/frame |
-| Auto-labeling accuracy (typical, before review) | 70–85% |
-| Max player speed cap | 46.8 km/h (13 m/s) |
-| Speed smoothing window | 0.5 s |
-| Perspective correction factor (PERSPECTIVE_K) | 0.6 |
+| YOLO detection + tracking | 77.8 ms/frame |
+| Identification (team + number) | 54.2 ms/frame |
+| Data and clip writing | 0.1 ms/frame |
+| **Throughput** | **≈ 7.5 frames/s — about 6.5 minutes for a 2-minute clip** |
+
+Accuracy on that run: **83.9 %** of the automatic labels survived review — 43
+clips, 26 correct, 4 corrected, 12 unidentified tracks assigned by hand, 1
+rejected. Expect this to move with footage quality, camera work, and how clearly
+the two teams' jerseys differ in brightness.
+
+These figures are slower than earlier versions of this project by design: the
+jersey number is now read on *every* frame instead of every third, and tracking
+runs BoT-SORT with appearance ReID instead of IoU-only ByteTrack. Both cost
+machine time and both cut the number of tracks a human has to fix afterwards,
+which is the expensive part.
+
+Every session records its own numbers: they are on the job page and in
+`review_manifest.json` under `profile`.
 
 ## Configuration Format
 
-Team configurations are stored as JSON in `webapp/configs/`. Example structure:
+Team configurations are JSON. Running from source they live in `webapp/configs/`;
+in the installed app they sit in the user data directory listed above. The colours
+below decide which side is the light team — the classifier works on brightness,
+not on the colour names themselves.
 
 ```json
 {
@@ -225,4 +290,4 @@ Team configurations are stored as JSON in `webapp/configs/`. Example structure:
 
 ## Author
 
-**Medvedev M.D.** — Research project, 2025
+**Medvedev M.D.** — Master's research project, 2025–2026
