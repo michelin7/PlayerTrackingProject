@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec for PS&F. Build from webapp/: pyinstaller packaging/psf.spec"""
+import platform
 import sys
 from pathlib import Path
 
@@ -15,7 +16,8 @@ datas = [
     (str(ROOT / "models" / "Player_Detection.pt"), "models"),
     (str(ROOT / "models" / "NumbersRec.pt"), "models"),
 ]
-if sys.platform == "darwin":                   # CoreML detector, macOS only
+# The CoreML detector is only ever loaded on MPS, so it is dead weight anywhere else.
+if sys.platform == "darwin" and platform.machine() == "arm64":
     datas.append((str(ROOT / "models" / "Player_Detection.mlpackage"),
                   "models/Player_Detection.mlpackage"))
 

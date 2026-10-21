@@ -84,9 +84,18 @@ Download the installer for your system from the **Releases** page, then follow t
 steps below. The app is not signed with a paid developer certificate, so each
 system asks for one confirmation the first time — once per computer, never again.
 
-### macOS (Apple Silicon)
+### macOS
 
-1. Open `PSF-macOS.dmg` and drag **Player Scouting & Fitness** into **Applications**.
+Two builds are published; pick the one matching your Mac. Apple menu  → **About
+This Mac**: a *Chip* line (M1-M4) means Apple Silicon, a *Processor* line with
+Intel means the Intel build.
+
+| Mac | File |
+| --- | --- |
+| Apple Silicon (M1-M4) | `PSF-macOS-arm64.dmg` |
+| Intel | `PSF-macOS-intel.dmg` |
+
+1. Open the DMG and drag **Player Scouting & Fitness** into **Applications**.
 2. Open **Applications** and double-click the app. macOS says it cannot verify the
    developer — click **Done**.
 3. Open **System Settings → Privacy & Security**, scroll to the bottom and click

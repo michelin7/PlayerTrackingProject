@@ -7,7 +7,13 @@ on:
 
 jobs:
   macos:
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, arch: arm64 }         # Apple Silicon
+          - { runner: macos-15-intel, arch: intel }   # x86_64; macos-13 is retired
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
         with: { lfs: true }
@@ -17,13 +23,18 @@ jobs:
           test -f models/Player_Detection.pt || { echo "models/ missing (Git LFS?)"; exit 1; }
           pip install -r webapp/requirements.txt pywebview pyinstaller
           brew install create-dmg
+      - name: pin the last Intel-compatible torch
+        if: matrix.arch == 'intel'
+        # PyTorch stopped shipping macOS x86_64 wheels after 2.2.2, and that
+        # build is compiled against numpy 1.x.
+        run: pip install "torch==2.2.2" "torchvision==0.17.2" "numpy<2"
       - run: PY=python bash webapp/packaging/build_macos.sh
       - name: selftest
         run: "'webapp/dist/Player Scouting & Fitness.app/Contents/MacOS/PSF' --selftest"
       - uses: actions/upload-artifact@v4
         with:
-          name: PSF-macOS
-          path: webapp/dist/PSF-macOS.dmg
+          name: PSF-macOS-${{ matrix.arch }}
+          path: webapp/dist/PSF-macOS-${{ matrix.arch }}.dmg
 
   windows:
     runs-on: windows-latest

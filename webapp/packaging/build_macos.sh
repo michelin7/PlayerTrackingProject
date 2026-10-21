@@ -5,6 +5,11 @@ cd "$(dirname "$0")/.."                       # webapp/
 PY=${PY:-python3}
 DIST=${DIST:-dist}
 APP="$DIST/Player Scouting & Fitness.app"
+case "$(uname -m)" in
+  arm64) ARCH=arm64 ;;          # Apple Silicon
+  *)     ARCH=intel ;;          # x86_64
+esac
+DMG="$DIST/PSF-macOS-$ARCH.dmg"
 
 "$PY" tools/make_icons.py
 "$PY" tools/make_dmg_bg.py
@@ -18,7 +23,7 @@ codesign --verify --deep --strict "$APP" && echo "ad-hoc signature ok"
 
 STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"
-rm -f "$DIST/PSF-macOS.dmg"
+rm -f "$DMG"
 create-dmg \
   --volname "Player Scouting & Fitness" \
   --background packaging/dmg_bg.png \
@@ -28,6 +33,6 @@ create-dmg \
   --app-drop-link 580 200 \
   --hide-extension "Player Scouting & Fitness.app" \
   --no-internet-enable \
-  "$DIST/PSF-macOS.dmg" "$STAGE"
+  "$DMG" "$STAGE"
 rm -rf "$STAGE"
-echo "built: $DIST/PSF-macOS.dmg"
+echo "built: $DMG"
