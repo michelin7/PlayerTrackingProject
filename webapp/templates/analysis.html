@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+{% block title %}Video analysis{% endblock %}
+
+{% block content %}
+<style>
+/* a track that left the frame unanswered */
+.ask-item { border-top:1px solid var(--border); padding:.6rem 0; }
+.ask-item:first-child { border-top:none; padding-top:0; }
+.ask-head { display:flex; gap:.5rem; align-items:center; font-size:.85rem; margin-bottom:.4rem; }
+.ask-crop { max-height:120px; border-radius:6px; display:block; margin:0 auto .45rem; }
+.ask-row { display:flex; gap:.35rem; align-items:center; flex-wrap:wrap; }
+
+.an-mode { display:flex; gap:.5rem; align-items:center; font-weight:600; cursor:pointer; }
+.an-mode input { width:16px; height:16px; accent-color:var(--primary); }
+
+#shiftEditor, #trackEditor { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; margin:.5rem 0 .7rem; padding:.55rem .6rem; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); }
+</style>
+
+<div class="page-header">
+    <h1 data-i18n="an_title">Анализ видео</h1>
+    <p class="page-desc" data-i18n="an_desc">Один вход для обеих схем работы: живой контроль — вы правите треки по ходу видео, автоматический режим — система обрабатывает запись сама, а правки вносятся потом в ревизии.</p>
+</div>
+
+<!-- SETUP -->
+<div id="setup" class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div>
+            <label class="form-label" data-i18n="live_video">Видео</label>
+            <div class="file-drop-zone" id="videoDrop" style="padding:1.5rem 1rem">
+                <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p data-i18n="up_drop_hint">Перетащите видеофайл сюда или нажмите для выбора</p>
+                <p class="drop-hint" data-i18n="up_drop_sub">Поддерживаемые форматы: MP4, AVI, MOV, MKV</p>
+                <input id="video" type="file" accept=".mp4,.avi,.mov,.mkv" hidden>
+            </div>
+            <div class="file-selected" id="videoSelected" style="display:none;margin-top:.5rem">
+                <span class="file-name" id="videoName"></span>
+                <button type="button" id="videoClear" class="btn btn-sm btn-outline" data-i18n="up_clear">Убрать</button>
+            </div>
+        </div>
+        <div>
+            <label class="form-label" data-i18n="live_config">Конфигурация (команды, ростер)</label>
+            <select id="config" class="form-input"><option value="" data-i18n="live_config_none">— без конфигурации —</option></select>
+            <div id="cfgPrev" class="config-preview-box" style="display:none;margin-top:.6rem"></div>
+        </div>
+    </div>
+    <label class="an-mode" data-i18n-title="an_mode_hint">
+        <input type="checkbox" id="modeLive" checked>
+        <span data-i18n="an_mode_live">Живой контроль (правка по ходу видео)</span>
+    </label>
+    <div class="side-muted" style="margin:.2rem 0 .9rem;font-size:.78rem" data-i18n="an_mode_hint">Снимите галочку — запись обработается автоматически в фоне, без вашего участия; правки внесёте в ревизии.</div>
+    <button id="btnStart" class="btn btn-primary" data-i18n="live_start">Запустить</button>
+    <span id="startErr" style="color:#e05252;margin-left:.75rem"></span>
+</div>
+
+<!-- PLAYER -->
+<div id="player" style="display:none">
+  <div class="live-layout">
+    <div class="live-main">
+        <div class="card" style="padding:0;overflow:hidden">
+            <img id="frame" style="width:100%;display:block;background:#000" alt="">
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <div id="status" style="font-weight:600">…</div>
+            <div style="color:var(--text-muted);font-variant-numeric:tabular-nums"><span id="tvid">0:00</span> / <span id="tdur">0:00</span></div>
+            <div style="color:var(--text-muted)"><span id="fcur">0</span>/<span id="ftot">0</span> <span data-i18n="live_frames">кадров</span></div>
+            <div style="color:var(--text-muted)"><span data-i18n="live_decisions">решений</span>: <span id="evc">0</span></div>
+            <div style="color:var(--text-muted)"><span data-i18n="live_corrections">исправлений</span>: <span id="ovc">0</span></div>
+            <div style="color:var(--text-muted)" data-i18n-title="live_check_hint"><span data-i18n="live_check">сверка</span>: <span id="chk">—</span></div>
+            <div style="margin-left:auto;display:flex;gap:.5rem">
+                <button id="btnPause" class="btn btn-sm" data-i18n="live_pause">Пауза</button>
+                <button id="btnResume" class="btn btn-sm" style="display:none" data-i18n="live_resume">Продолжить</button>
+                <button id="btnStop" class="btn btn-sm" data-i18n="live_stop">Стоп</button>
+            </div>
+            <div id="saveBox" style="display:none;width:100%">
+                <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem">
+                    <span id="saveWhat"></span><span id="saveNum" style="color:var(--text-muted);font-variant-numeric:tabular-nums"></span>
+                </div>
+                <div style="height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden">
+                    <div id="saveBar" style="height:100%;width:0;background:var(--primary);transition:width .3s"></div>
+                </div>
+            </div>
+        </div>
+        <div class="card" id="tlcard">
+            <div class="side-title" data-i18n="live_shifts_title">Смены на площадке</div>
+            <div class="side-muted" style="margin:-.4rem 0 .6rem;font-size:.75rem" data-i18n="live_shifts_hint">Штриховка — игрок был на льду, но вне кадра (пропуск менее 30 c засчитывается в игровое время). Клик по игроку — исправить/убрать.</div>
+            <div id="shiftEditor" style="display:none">
+                <span id="seLabel" class="fixlabel" style="min-width:auto"></span>
+                <select id="seNum" class="form-input" style="width:170px"></select>
+                <select id="seTeam" class="form-input" style="width:96px"><option value="Home">Home</option><option value="Away">Away</option></select>
+                <button id="seSave" class="btn btn-primary btn-sm" data-i18n="live_save">Сохранить</button>
+                <button id="seRemove" class="btn btn-sm" data-i18n="live_remove_player">Убрать игрока</button>
+                <button id="seCancel" class="btn btn-sm" data-i18n="live_cancel">Отмена</button>
+            </div>
+            <div class="tl-row tl-head">
+                <span></span>
+                <span data-i18n="live_col_toi">Вр</span>
+                <span data-i18n="live_col_shifts">См</span>
+                <span></span>
+            </div>
+            <div id="oniceNow" class="side-muted" style="margin:-.2rem 0 .5rem;font-size:.78rem"></div>
+            <div id="tlrows"></div>
+            <div id="tlempty" class="side-muted" data-i18n="live_shifts_empty">Пока никто не идентифицирован по номеру.</div>
+        </div>
+    </div>
+
+    <aside class="live-side">
+        <div class="card" id="askcard" style="display:none;border-color:var(--primary)">
+            <div class="side-title"><span data-i18n="live_ask_title">Треки без ответа</span> <span id="askcount" class="side-count"></span></div>
+            <div class="side-muted" style="margin:-.4rem 0 .6rem;font-size:.75rem" data-i18n="live_ask_hint">Трек ушёл из кадра, а вы его не подтверждали. Скажите, кто это был, — иначе он попадёт в итог с тем номером, который прочла система.</div>
+            <div id="asklist"></div>
+        </div>
+        <div class="card" id="trkcard">
+            <div class="side-title" data-i18n="live_tracks_title">На площадке</div>
+            <div class="side-muted" style="margin:-.4rem 0 .6rem;font-size:.75rem" data-i18n="live_tracks_hint">Все треки в кадре. Клик — исправить номер и команду, разрезать трек или игнорировать его.</div>
+            <div id="trackEditor" style="display:none">
+                <span id="teLabel" class="fixlabel" style="min-width:auto"></span>
+                <select id="teNum" class="form-input" style="width:170px"></select>
+                <select id="teTeam" class="form-input" style="width:96px"><option value="Home">Home</option><option value="Away">Away</option></select>
+                <button id="teSave" class="btn btn-primary btn-sm" data-i18n="live_save">Сохранить</button>
+                <button id="teCut" class="btn btn-sm" data-i18n="live_track_cut" data-i18n-title="live_cut_hint">Разрезать здесь</button>
+                <button id="teIgnore" class="btn btn-sm" data-i18n-title="live_ignore_hint">Игнорировать трек</button>
+                <button id="teClear" class="btn btn-sm" data-i18n="live_track_clear">Сбросить правку</button>
+                <button id="teCancel" class="btn btn-sm" data-i18n="live_cancel">Отмена</button>
+                <span id="teMsg" style="color:#e05252;font-size:.8rem"></span>
+            </div>
+            <div id="trklist" class="trk-grid"></div>
+            <div id="trkempty" class="side-muted" data-i18n="live_tracks_empty">В кадре никого.</div>
+            <div id="soonbox" style="display:none;margin-top:.9rem">
+                <div class="side-title" style="margin-bottom:.35rem"><span data-i18n="live_soon_title">Могут вернуться в кадр</span> <span id="sooncount" class="side-count"></span></div>
+                <div class="side-muted" style="margin-bottom:.5rem;font-size:.75rem" data-i18n="live_soon_hint">Треки вне кадра, которые трекер ещё помнит: вернутся под тем же номером. Когда он их забудет, они уйдут отсюда — и спросим, кто это был.</div>
+                <div id="soonlist" class="trk-grid"></div>
+            </div>
+        </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const T = (k, v) => (window.PSF_I18N ? window.PSF_I18N.t(k, v) : k);
+let framePoll = null, statePoll = null;
+let ROSTER = {};        // squads from the config: the only numbers on offer
+
+const teamColor = t => t === 'Away' ? '#FF6300' : '#29B6D8';
+const ON_ICE_LIMIT = 6;      // skaters per team; a goalie is not tracked here
+const fmt = s => { s=Math.round(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+
+fetch('/api/configs').then(r=>r.json()).then(list=>{
+    for (const c of list) { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; $('config').appendChild(o); }
+});
+
+// The roster is what both modes are judged against, so show it before the run.
+let CFG = null;
+$('config').onchange = async () => {
+    const box = $('cfgPrev');
+    CFG = null; box.style.display = 'none';
+    if (!$('config').value) return;
+    try { CFG = await (await fetch('/api/configs/' + $('config').value)).json(); } catch(e) { return; }
+    const side = (key, label) => {
+        const squad = CFG[key] || {}, cols = ((CFG.teams_colors_info||{})[label]||[]).join(', ');
+        return `<div class="preview-team"><span class="badge badge-${label.toLowerCase()}">${label}</span> <b>${cols}</b>`
+             + ` &mdash; ${Object.keys(squad).length} ${T('up_preview_players')}: `
+             + Object.entries(squad).map(([n,p]) => `#${n} ${p}`).join(', ') + '</div>';
+    };
+    box.innerHTML = '<div class="config-preview-content">' + side('home_team','Home') + side('away_team','Away') + '</div>';
+    box.style.display = '';
+};
+
+// styled file picker (reuses the app's drop-zone pattern)
+const drop = $('videoDrop');
+drop.onclick = () => $('video').click();
+$('video').onchange = () => showFile($('video').files[0]);
+$('videoClear').onclick = (e) => { e.stopPropagation(); $('video').value=''; showFile(null); };
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('drag-over'); };
+drop.ondragleave = () => drop.classList.remove('drag-over');
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('drag-over'); if(e.dataTransfer.files[0]){ $('video').files=e.dataTransfer.files; showFile(e.dataTransfer.files[0]); } };
+function showFile(f) {
+    $('videoDrop').style.display = f ? 'none' : '';
+    $('videoSelected').style.display = f ? 'flex' : 'none';
+    if (f) $('videoName').textContent = f.name;
+}
+
+$('btnStart').onclick = async () => {
+    const f = $('video').files[0];
+    const live = $('modeLive').checked;
+    if (!f) { $('startErr').textContent=T('live_err_novideo'); return; }
+    // Automatic mode runs unattended: without a roster there is nothing to
+    // match the numbers against, and the result is unusable.
+    if (!live && !CFG) { $('startErr').textContent=T('up_alert_cfg'); return; }
+    $('btnStart').disabled=true; $('startErr').textContent=T('live_uploading');
+    const fd = new FormData();
+    fd.append('video', f);
+    if (CFG) fd.append('config_json', JSON.stringify(CFG));
+    const d = await (await fetch(live ? '/live/start' : '/upload', {method:'POST', body:fd})).json();
+    $('btnStart').disabled=false;
+    if (d.error) { $('startErr').textContent=d.error; return; }
+    $('startErr').textContent='';
+    if (!live) { window.location = d.redirect; return; }   // progress page -> review
+    $('setup').style.display='none'; $('player').style.display='';
+    $('ftot').textContent=d.total;
+    startPolling();
+};
+
+function startPolling() {
+    framePoll = setInterval(()=>{ $('frame').src='/live/frame?t='+Date.now(); }, 150);
+    statePoll = setInterval(pollState, 500);
+    pollState();
+}
+function stopPolling(){ clearInterval(framePoll); clearInterval(statePoll); }
+
+async function pollState() {
+    const d = await (await fetch('/live/state')).json();
+    $('status').textContent = T('live_st_'+d.status) || d.status;
+    $('fcur').textContent=d.frame||0; $('evc').textContent=d.events||0; $('ovc').textContent=d.overrides||0;
+    $('tvid').textContent=fmt(d.now||0); $('tdur').textContent=fmt(d.duration||0);
+    // What the system would have read by itself on the tracks you named: the
+    // only honest accuracy number available while the session is still running.
+    // Saving a session is minutes of video work: say which part is running and
+    // how far it is, or the page reads as hung.
+    const sv = d.save || {};
+    $('saveBox').style.display = sv.phase ? '' : 'none';
+    if (sv.phase) {
+        $('saveWhat').textContent = sv.message || T('live_sv_' + sv.phase);
+        $('saveNum').textContent = sv.total ? `${sv.done || 0} / ${sv.total}` : '';
+        $('saveBar').style.width = sv.total ? Math.min((sv.done || 0) / sv.total * 100, 100) + '%' : '100%';
+    }
+    // the session can pause itself (a track left the frame unanswered)
+    $('btnPause').style.display = d.status === 'playing' ? '' : 'none';
+    $('btnResume').style.display = d.status === 'paused' ? '' : 'none';
+    const ck = d.check || {};
+    $('chk').textContent = ck.reads ? `${ck.pct}% (${ck.agree}/${ck.reads})` : '—';
+    ROSTER = d.roster || ROSTER;
+    renderShifts(d); renderTracks(d); renderPending(d);
+    if (d.status==='error') { stopPolling(); if(d.error) $('status').textContent='⚠ '+d.error; return; }
+    if (d.status==='finalizing') { $('status').textContent = T('live_st_finalizing'); return; }
+    if (d.status==='done') {
+        // Corrections were made live, so the session finishes on the finalized
+        // result (per-player videos + shifts), not on a review queue.
+        if (d.result_ready && d.job_id) { stopPolling(); window.location = '/result/'+d.job_id; return; }
+        if (d.review_ready && d.job_id) { stopPolling(); window.location = '/review/'+d.job_id; return; }
+        $('status').textContent = T('live_st_finishing');   // still flushing clips
+        return;
+    }
+}
+
+// A track left the frame and nobody ever said who it was. Answer it, ignore it
+// (goalie, stray box) or skip it — skipping keeps the system's own read.
+let askSig = '';
+function renderPending(d) {
+    const list = d.pending || [];
+    $('askcard').style.display = list.length ? '' : 'none';
+    $('askcount').textContent = list.length ? '(' + list.length + ')' : '';
+    const sig = JSON.stringify(list.map(q => q.pid));
+    if (sig === askSig) return;                                  // same questions
+    if ($('asklist').contains(document.activeElement)) return;   // don't clobber typing
+    askSig = sig;
+    $('asklist').innerHTML = list.map(q => `
+        <div class="ask-item" data-pid="${q.pid}">
+            ${q.crop ? `<img class="ask-crop" src="${q.crop}">` : ''}
+            <div class="ask-head"><b>${q.label}</b>
+                <span style="color:var(--text-muted)">${fmt(q.toi)} ${T('live_ask_seen')}</span></div>
+            <div class="ask-row">
+                <select class="form-input asknum" style="width:170px"></select>
+                <select class="form-input askteam" style="width:92px">
+                    <option value="Home"${q.team !== 'Away' ? ' selected' : ''}>Home</option>
+                    <option value="Away"${q.team === 'Away' ? ' selected' : ''}>Away</option>
+                </select>
+                <button class="btn btn-primary btn-sm asksave">${T('live_save')}</button>
+                <button class="btn btn-sm askignore">${T('live_track_ignore')}</button>
+                <button class="btn btn-sm askskip">${T('live_ask_skip')}</button>
+            </div>
+        </div>`).join('');
+    $('asklist').querySelectorAll('.ask-item').forEach((it, i) => {
+        const pid = +it.dataset.pid;
+        const num = it.querySelector('.asknum'), team = it.querySelector('.askteam');
+        PSF_ROSTER.fill(num, ROSTER, team.value, list[i].number);
+        team.onchange = () => PSF_ROSTER.refill(num, ROSTER, team.value);
+        const post = (url, body) => fetch(url, {method:'POST',
+            headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+            .then(() => { askSig = ''; pollState(); });
+        it.querySelector('.asksave').onclick = () => post('/live/override',
+            {pid, number: num.value || null, team: team.value});
+        it.querySelector('.askignore').onclick = () => post('/live/ignore', {pid, on: true});
+        it.querySelector('.askskip').onclick = () => post('/live/pending', {pid});
+    });
+}
+
+// Every track the system is holding this frame — identified or not. An
+// unidentified one shows its track id, which is what a correction addresses.
+function renderTracks(d) {
+    const tracks = d.tracks || [], tc = d.team_colors || {};
+    $('trkempty').style.display = tracks.length ? 'none' : '';
+    $('trklist').innerHTML = tracks.map(t => {
+        const col = t.team ? (tc[t.team] || teamColor(t.team)) : 'var(--text-muted)';
+        // An unidentified chip already reads "Track 12"; an identified one needs
+        // the id added, or its jersey number looks like a track id.
+        const id = t.number == null ? '' : `<span class="trk-id">T${t.pid}</span>`;
+        const cuts = t.cuts ? `<span class="trk-cuts" title="${T('live_cut_done')}">&#9986;${t.cuts > 1 ? t.cuts : ''}</span>` : '';
+        return `<span class="trk-chip${t.number == null ? ' unknown' : ''}${t.fixed ? ' fixed' : ''}${t.ignored ? ' ignored' : ''}"
+                      data-ignored="${t.ignored ? 1 : ''}"
+                      data-pid="${t.pid}" data-number="${t.number == null ? '' : t.number}"
+                      data-team="${t.team || ''}" title="${T('live_edit_player')}">
+            <span class="trk-dot" style="background:${col}"></span>${t.label}${id}${cuts}</span>`;
+    }).join('');
+    $('trklist').querySelectorAll('.trk-chip').forEach(el =>
+        el.onclick = () => openTrackEditor(el.dataset));
+
+    // Out of frame but not yet forgotten by the tracker: these come back under
+    // the same id, so naming one now saves naming it again later.
+    const soon = d.soon || [];
+    $('soonbox').style.display = soon.length ? '' : 'none';
+    $('sooncount').textContent = soon.length ? '(' + soon.length + ')' : '';
+    $('soonlist').innerHTML = soon.map(t => {
+        const col = t.team ? (tc[t.team] || teamColor(t.team)) : 'var(--text-muted)';
+        const id = t.number == null ? '' : `<span class="trk-id">T${t.pid}</span>`;
+        return `<span class="trk-chip soon${t.number == null ? ' unknown' : ''}${t.fixed ? ' fixed' : ''}"
+                      data-pid="${t.pid}" data-number="${t.number == null ? '' : t.number}"
+                      data-team="${t.team || ''}" title="${T('live_edit_player')}">
+            <span class="trk-dot" style="background:${col}"></span>${t.label}${id}
+            <span class="trk-gone">−${t.gone}s</span></span>`;
+    }).join('');
+    $('soonlist').querySelectorAll('.trk-chip').forEach(el =>
+        el.onclick = () => openTrackEditor(el.dataset));
+}
+function openTrackEditor(ds) {
+    $('teMsg').textContent = '';
+    $('teLabel').textContent = 'Track ' + ds.pid;
+    const off = !!ds.ignored;
+    $('teIgnore').textContent = T(off ? 'live_track_unignore' : 'live_track_ignore');
+    $('teIgnore').dataset.on = off ? '' : '1';
+    // an ignored track has no identity to edit — only the way back
+    for (const id of ['teNum', 'teTeam', 'teSave', 'teCut', 'teClear'])
+        $(id).style.display = off ? 'none' : '';
+    $('teTeam').value = ds.team === 'Away' ? 'Away' : 'Home';
+    PSF_ROSTER.fill($('teNum'), ROSTER, $('teTeam').value, ds.number || '');
+    $('trackEditor').dataset.pid = ds.pid;
+    $('trackEditor').style.display = 'flex';
+}
+async function postOverride(body) {
+    await fetch('/live/override', {method:'POST', headers:{'Content-Type':'application/json'},
+                                   body: JSON.stringify(body)});
+    $('trackEditor').style.display = 'none'; pollState();
+}
+$('teTeam').onchange = () => PSF_ROSTER.refill($('teNum'), ROSTER, $('teTeam').value);
+$('teSave').onclick = () => { if (!$('teNum').value) return;
+    postOverride({pid: +$('trackEditor').dataset.pid,
+                  number: $('teNum').value, team: $('teTeam').value}); };
+$('teClear').onclick = () => postOverride({pid: +$('trackEditor').dataset.pid, remove: true});
+// The tracker jumped onto another player: split the track HERE. Everything up to
+// now stays with the player it was, and the new part starts clean — name it with
+// the same editor once the system has seen the new jersey.
+$('teCut').onclick = async () => {
+    const pid = +$('trackEditor').dataset.pid;
+    const r = await fetch('/live/cut', {method:'POST', headers:{'Content-Type':'application/json'},
+                                        body: JSON.stringify({pid})});
+    if (!r.ok) { $('teMsg').textContent = T('live_cut_short'); return; }
+    $('teMsg').textContent = '';
+    $('trackEditor').style.display = 'none'; pollState();
+};
+// The goalie, a linesman, a detection on the bench: not a skater we count. An
+// override only relabels the track and the next frame re-reads it; ignoring
+// takes it out of the identification, the ice time and the clips at once.
+$('teIgnore').onclick = async () => {
+    await fetch('/live/ignore', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pid: +$('trackEditor').dataset.pid,
+                              on: !!$('teIgnore').dataset.on})});
+    $('trackEditor').style.display = 'none'; pollState();
+};
+$('teCancel').onclick = () => { $('trackEditor').style.display = 'none'; };
+
+function renderShifts(d) {
+    const dur = d.duration || 1, rows = $('tlrows');
+    const shifts = d.shifts || [];
+    $('tlempty').style.display = shifts.length ? 'none' : '';
+    const tc = d.team_colors || {};
+    const row = s => {
+        const col = tc[s.team] || teamColor(s.team);
+        const pct = (a,b) => `left:${a/dur*100}%;width:${Math.max((b-a)/dur*100,0.4)}%`;
+        const bridge = (s.bridged||[]).map(([a,b]) =>
+            `<div class="tl-bar tl-bridge" style="${pct(a,b)};--c:${col}"></div>`).join('');
+        const bars = (s.intervals||[]).map(([a,b]) =>
+            `<div class="tl-bar" style="${pct(a,b)};background:${col}"></div>`).join('');
+        const play = `<div class="tl-play" style="left:${Math.min((d.now||0)/dur*100,100)}%"></div>`;
+        return `<div class="tl-row">
+            <span class="tl-name" data-team="${s.team}" data-number="${s.number}" title="${T('live_edit_player')}"><span class="tl-dot${s.on?' on':''}" style="background:${col}"></span>#${s.number}${s.name?' '+s.name:''}</span>
+            <span style="font-variant-numeric:tabular-nums">${fmt(s.toi)}</span>
+            <span style="color:var(--text-muted)">${s.shifts}</span>
+            <div class="tl-track">${bridge}${bars}${play}</div>
+        </div>`;
+    };
+    rows.innerHTML = PSF_LINES.render(PSF_LINES.group(shifts, d.lines), row,
+                                      t => tc[t] || teamColor(t));
+    // How many skaters each team has on the ice right now. Six is the physical
+    // limit; more means something phantom is still getting through, and seeing
+    // the number beats discovering it later in the timeline.
+    const live_n = {};
+    for (const s of shifts) if (s.on) live_n[s.team] = (live_n[s.team] || 0) + 1;
+    const teams = Object.keys(live_n).sort();
+    $('oniceNow').innerHTML = teams.length
+        ? T('live_onice_now') + ' ' + teams.map(t => {
+            const n = live_n[t], over = n > ON_ICE_LIMIT;
+            return `<b style="color:${over ? '#e05252' : (tc[t] || teamColor(t))}">${t} ${n}</b>`
+                 + (over ? ` <span style="color:#e05252">${T('live_onice_over', {n: ON_ICE_LIMIT})}</span>` : '');
+          }).join(' · ')
+        : '';
+    rows.querySelectorAll('.tl-name').forEach(el =>
+        el.onclick = () => openShiftEditor(el, el.dataset.team, el.dataset.number));
+}
+
+// ---- review/fix a player in the shift list (a phantom, or a wrong number) ----
+function openShiftEditor(el, team, number) {
+    const ed = $('shiftEditor');
+    $('seLabel').textContent = '#' + number;
+    $('seTeam').value = team === 'Away' ? 'Away' : 'Home';
+    PSF_ROSTER.fill($('seNum'), ROSTER, $('seTeam').value, number);
+    ed.dataset.team = team; ed.dataset.number = number;
+    // Open it right under the row that was clicked: with 20+ players an editor
+    // at the top of the card is off-screen and reads as "nothing happened".
+    const row = el.closest('.tl-row');
+    document.querySelectorAll('.tl-row.editing').forEach(r => r.classList.remove('editing'));
+    row.classList.add('editing');
+    row.after(ed);
+    ed.style.display = 'flex';
+}
+async function postShift(body) {
+    await fetch('/live/shift',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    closeShiftEditor(); pollState();
+}
+function closeShiftEditor() {
+    const ed = $('shiftEditor');
+    ed.style.display = 'none';
+    $('tlcard').prepend(ed);           // out of the rows, which get re-rendered
+    document.querySelectorAll('.tl-row.editing').forEach(r => r.classList.remove('editing'));
+}
+$('seTeam').onchange = () => PSF_ROSTER.refill($('seNum'), ROSTER, $('seTeam').value);
+$('seSave').onclick = () => { const e=$('shiftEditor');
+    if (!$('seNum').value) return;
+    postShift({action:'reassign', team:e.dataset.team, number:e.dataset.number,
+               new_number:$('seNum').value, new_team:$('seTeam').value}); };
+$('seRemove').onclick = () => { const e=$('shiftEditor');
+    postShift({action:'remove', team:e.dataset.team, number:e.dataset.number}); };
+$('seCancel').onclick = () => closeShiftEditor();
+
+$('btnPause').onclick = async ()=>{ await fetch('/live/pause',{method:'POST'}); pollState(); };
+$('btnResume').onclick = async ()=>{ await fetch('/live/resume',{method:'POST'}); pollState(); };
+$('btnStop').onclick = async ()=>{ await fetch('/live/stop',{method:'POST'}); $('status').textContent=T('live_st_finishing'); };
+</script>
+{% endblock %}

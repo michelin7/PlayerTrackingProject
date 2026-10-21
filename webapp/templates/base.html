@@ -6,36 +6,93 @@
     <title>{% block title %}PS&F{% endblock %} — Player Scouting & Fitness</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    // Hudl chart theme: dark surfaces, single orange accent + grays, light
+    // gridlines on dark, Barlow labels.
+    if (window.Chart) {
+        Chart.defaults.font.family = "'Barlow', -apple-system, sans-serif";
+        Chart.defaults.font.size = 12;
+        Chart.defaults.color = '#9AA4AD';
+        Chart.defaults.borderColor = '#313B45';
+        Chart.defaults.plugins.legend.labels.color = '#FFFFFF';
+        Chart.defaults.plugins.legend.labels.boxWidth = 12;
+        Chart.defaults.plugins.tooltip.backgroundColor = '#232A31';
+        Chart.defaults.plugins.tooltip.titleColor = '#FFFFFF';
+        Chart.defaults.plugins.tooltip.bodyColor = '#E6E9EC';
+        Chart.defaults.plugins.tooltip.cornerRadius = 4;
+        Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.06)';
+        Chart.defaults.scale.grid.drawTicks = false;
+        Chart.defaults.scale.border.display = false;   // drop axis spines
+        Chart.defaults.scale.ticks.padding = 8;
+    }
+    </script>
     {% block head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="/" class="nav-logo">
-                <span class="logo-icon">&#x1F3D2;</span>
-                <span class="logo-text">PS&amp;F</span>
+    {% set automate_pages = ['analysis_page', 'job_status_page', 'review_page'] %}
+    {% set result_pages = ['results_page', 'result_page'] %}
+    {% set archive_pages = ['results_list_page', 'dashboard', 'stats'] %}
+    {% set process_pages = automate_pages + result_pages + archive_pages %}
+
+    <header class="topbar">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false">
+            <span class="menu-bar"></span><span class="menu-bar"></span><span class="menu-bar"></span>
+        </button>
+        <a href="{{ url_for('index') }}" class="nav-logo">
+            <span class="logo-mark">PS&amp;F</span>
+        </a>
+        <div class="topbar-right">
+            <button class="lang-toggle" id="langToggle" title="Switch language">RU</button>
+        </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('index') }}" class="side-link {% if request.endpoint == 'index' %}active{% endif %}">
+                <svg class="side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span class="side-text" data-i18n="nav_info">Инфо</span>
             </a>
-            <div class="nav-links">
-                <a href="{{ url_for('upload') }}" class="nav-link {% if request.endpoint == 'upload' %}active{% endif %}" data-i18n="nav_process">Обработка</a>
-                <a href="{{ url_for('results_list_page') }}" class="nav-link {% if request.endpoint == 'results_list_page' %}active{% endif %}" data-i18n="nav_results">Результаты</a>
-                <a href="{{ url_for('config_page') }}" class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}" data-i18n="nav_config">Конфигурация</a>
-                <button class="lang-toggle" id="langToggle" title="Switch language">RU</button>
+            <details class="side-group" {% if request.endpoint in process_pages %}open{% endif %}>
+                <summary class="side-link">
+                    <svg class="side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="1"/></svg><span class="side-text" data-i18n="nav_process">Обработка видео</span>
+                    <svg class="side-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </summary>
+                <div class="side-sub">
+                    <a href="{{ url_for('analysis_page') }}" class="side-link side-sublink {% if request.endpoint in automate_pages %}active{% endif %}">
+                        <span class="side-text" data-i18n="nav_analysis">Анализ видео</span>
+                    </a>
+                    <a href="{{ url_for('results_page') }}" class="side-link side-sublink {% if request.endpoint in result_pages %}active{% endif %}">
+                        <span class="side-text" data-i18n="nav_results">Результаты</span>
+                    </a>
+                    <a href="{{ url_for('results_list_page') }}" class="side-link side-sublink {% if request.endpoint in archive_pages %}active{% endif %}">
+                        <span class="side-text" data-i18n="nav_archive">Архив</span>
+                    </a>
+                </div>
+            </details>
+            <a href="{{ url_for('config_page') }}" class="side-link {% if request.endpoint == 'config_page' %}active{% endif %}">
+                <svg class="side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg><span class="side-text" data-i18n="nav_config">Конфигурации</span>
+            </a>
+            <a href="{{ url_for('dataset_page') }}" class="side-link {% if request.endpoint == 'dataset_page' %}active{% endif %}">
+                <svg class="side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="side-text" data-i18n="nav_dataset">Датасет</span>
+            </a>
+        </nav>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app-body">
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <p data-i18n="footer_title">Player Scouting &amp; Fitness &mdash; Система видеоаналитики хоккейных матчей</p>
+                <p class="footer-sub" data-i18n="footer_sub">YOLO + BoT-SORT + CoreML | M. Medvedev | Master's thesis 2025</p>
             </div>
-        </div>
-    </nav>
-
-    <main class="main-content">
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="footer">
-        <div class="footer-content">
-            <p data-i18n="footer_title">Player Scouting &amp; Fitness &mdash; Система видеоаналитики хоккейных матчей</p>
-            <p class="footer-sub">YOLO + ByteTrack + CoreML | Медведев М.Д. | НИР 2025</p>
-        </div>
-    </footer>
+        </footer>
+    </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>

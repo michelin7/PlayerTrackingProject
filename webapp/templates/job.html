@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Обработка видео</h1>
+    <h1 data-i18n="job_title">Обработка видео</h1>
     <p class="page-desc">{{ job.video }}</p>
 </div>
 
@@ -32,47 +32,47 @@
         <div class="job-profile" id="jobProfile" style="display:none; margin-top:1rem">
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem">
                 <div class="profile-stat">
-                    <span class="profile-label">Скорость</span>
+                    <span class="profile-label" data-i18n="job_prof_speed">Скорость</span>
                     <span class="profile-value" id="profFps">—</span>
-                    <span class="profile-unit">FPS</span>
+                    <span class="profile-unit" data-i18n="job_prof_u_fps">FPS</span>
                 </div>
                 <div class="profile-stat">
-                    <span class="profile-label">YOLO + Track</span>
+                    <span class="profile-label" data-i18n="job_prof_track">YOLO + Track</span>
                     <span class="profile-value" id="profTrack">—</span>
-                    <span class="profile-unit">мс/кадр</span>
+                    <span class="profile-unit" data-i18n="job_prof_u_ms">мс/кадр</span>
                 </div>
                 <div class="profile-stat">
-                    <span class="profile-label">Идентификация</span>
+                    <span class="profile-label" data-i18n="job_prof_ident">Идентификация</span>
                     <span class="profile-value" id="profIdent">—</span>
-                    <span class="profile-unit">мс/кадр</span>
+                    <span class="profile-unit" data-i18n="job_prof_u_ms">мс/кадр</span>
                 </div>
                 <div class="profile-stat">
-                    <span class="profile-label">Данные + запись</span>
+                    <span class="profile-label" data-i18n="job_prof_data">Данные + запись</span>
                     <span class="profile-value" id="profData">—</span>
-                    <span class="profile-unit">мс/кадр</span>
+                    <span class="profile-unit" data-i18n="job_prof_u_ms">мс/кадр</span>
                 </div>
                 <div class="profile-stat">
-                    <span class="profile-label">Время обработки</span>
+                    <span class="profile-label" data-i18n="job_prof_total">Время обработки</span>
                     <span class="profile-value" id="profTotal">—</span>
-                    <span class="profile-unit">сек</span>
+                    <span class="profile-unit" data-i18n="job_prof_u_sec">сек</span>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="job-results" id="jobResults" style="display:none">
-        <h3>Результаты</h3>
+        <h3 data-i18n="job_results">Результаты</h3>
         <div class="table-wrapper">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Имя</th>
-                        <th>Номер</th>
-                        <th>Команда</th>
-                        <th>Время (с)</th>
-                        <th>Дистанция (м)</th>
-                        <th>Ср. скорость (км/ч)</th>
-                        <th>Макс. скорость (км/ч)</th>
+                        <th data-i18n="job_col_name">Имя</th>
+                        <th data-i18n="job_col_number">Номер</th>
+                        <th data-i18n="job_col_team">Команда</th>
+                        <th data-i18n="job_col_time">Время (с)</th>
+                        <th data-i18n="job_col_dist">Дистанция (м)</th>
+                        <th data-i18n="job_col_avg">Ср. скорость (км/ч)</th>
+                        <th data-i18n="job_col_max">Макс. скорость (км/ч)</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody"></tbody>
@@ -81,18 +81,18 @@
 
         <div class="stats-charts-row" style="margin-top: 1.5rem">
             <div class="card">
-                <h3 class="card-title">Время на льду</h3>
+                <h3 class="card-title" data-i18n="job_chart_time">Время на льду</h3>
                 <canvas id="resultTimeChart" height="250"></canvas>
             </div>
             <div class="card">
-                <h3 class="card-title">Пройденная дистанция</h3>
+                <h3 class="card-title" data-i18n="job_chart_dist">Пройденная дистанция</h3>
                 <canvas id="resultDistChart" height="250"></canvas>
             </div>
         </div>
 
         <div class="job-actions">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Перейти к дашборду</a>
-            <a href="{{ url_for('upload') }}" class="btn btn-secondary">Обработать ещё</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary" data-i18n="job_btn_dashboard">Перейти к дашборду</a>
+            <a href="{{ url_for('upload') }}" class="btn btn-secondary" data-i18n="job_btn_more">Обработать ещё</a>
         </div>
     </div>
 </div>
@@ -104,9 +104,9 @@ const jobId = "{{ job_id }}";
 let pollInterval;
 
 function teamColor(team) {
-    if (team === 'Home') return '#3b82f6';
-    if (team === 'Away') return '#ef4444';
-    return '#6b7280';
+    if (team === 'Home') return '#4A90D9';
+    if (team === 'Away') return '#FF6300';
+    return '#9AA4AD';
 }
 
 function updateUI(job) {
@@ -119,19 +119,25 @@ function updateUI(job) {
     const message = document.getElementById('jobMessage');
     const card = document.getElementById('jobCard');
 
-    statusText.textContent = {
-        'queued': 'В очереди',
-        'running': 'Обработка',
-        'completed': 'Завершено',
-        'error': 'Ошибка'
-    }[job.status] || job.status;
+    const statusKeyMap = {
+        'queued': 'job_status_queued',
+        'running': 'job_status_running',
+        'completed': 'job_status_completed',
+        'error': 'job_status_error',
+        'review': 'job_status_review',
+    };
+    const statusKey = statusKeyMap[job.status];
+    statusText.textContent = statusKey ? PSF_I18N.t(statusKey) : job.status;
+    statusText.dataset.status = job.status;
 
     progressBar.style.width = job.progress + '%';
     progressPercent.textContent = job.progress + '%';
-    message.textContent = job.message;
+    // The server writes its status line in one language; the key it sends with
+    // it is what the page can actually translate.
+    message.textContent = job.msg ? PSF_I18N.t(job.msg.k, job.msg.v) : job.message;
 
     if (job.total_frames > 0) {
-        framesInfo.textContent = `${job.processed_frames || 0} / ${job.total_frames} кадров`;
+        framesInfo.textContent = PSF_I18N.t('job_frames_of', {p: job.processed_frames || 0, t: job.total_frames});
     }
 
     // Show profiling data
@@ -163,8 +169,12 @@ function updateUI(job) {
     }
 }
 
+let __resultCharts = [];
+let __lastStats = null;
+
 function showResults(stats) {
     if (!stats || !stats.length) return;
+    __lastStats = stats;
     const container = document.getElementById('jobResults');
     container.style.display = '';
 
@@ -185,24 +195,39 @@ function showResults(stats) {
     }
 
     const named = stats.filter(r => r.Name).sort((a, b) => b['Time (s)'] - a['Time (s)']);
+    __resultCharts.forEach(c => c.destroy());
+    __resultCharts = [];
 
-    new Chart(document.getElementById('resultTimeChart'), {
+    __resultCharts.push(new Chart(document.getElementById('resultTimeChart'), {
         type: 'bar',
         data: {
             labels: named.map(p => p.Name),
-            datasets: [{ label: 'Время (с)', data: named.map(p => p['Time (s)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
+            datasets: [{ label: PSF_I18N.t('job_chart_time_label'), data: named.map(p => p['Time (s)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
         },
         options: { responsive: true, plugins: { legend: { display: false } } }
-    });
+    }));
 
     const distSorted = [...named].sort((a, b) => b['Distance (m)'] - a['Distance (m)']);
-    new Chart(document.getElementById('resultDistChart'), {
+    __resultCharts.push(new Chart(document.getElementById('resultDistChart'), {
         type: 'bar',
         data: {
             labels: distSorted.map(p => p.Name),
-            datasets: [{ label: 'Дистанция (м)', data: distSorted.map(p => p['Distance (m)']), backgroundColor: distSorted.map(p => teamColor(p.Team)) }]
+            datasets: [{ label: PSF_I18N.t('job_chart_dist_label'), data: distSorted.map(p => p['Distance (m)']), backgroundColor: distSorted.map(p => teamColor(p.Team)) }]
         },
         options: { responsive: true, plugins: { legend: { display: false } } }
+    }));
+}
+
+if (window.PSF_I18N) {
+    PSF_I18N.onChange(() => {
+        // Re-render dynamic status text and frame counter
+        const statusText = document.getElementById('statusText');
+        if (statusText && statusText.dataset.status) {
+            const map = {queued:'job_status_queued', running:'job_status_running', completed:'job_status_completed', error:'job_status_error', review:'job_status_review'};
+            const k = map[statusText.dataset.status];
+            if (k) statusText.textContent = PSF_I18N.t(k);
+        }
+        if (__lastStats) showResults(__lastStats);
     });
 }
 

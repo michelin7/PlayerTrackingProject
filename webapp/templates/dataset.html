@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Dataset{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 data-i18n="ds_title">Fine-tuning dataset</h1>
+    <p class="page-desc" data-i18n="ds_desc">Frames (player crops) with detected digits and draft YOLO labels for fine-tuning NumbersRec. The export is ready to import into Roboflow.</p>
+</div>
+
+<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div>
+        <div style="font-size:.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em" data-i18n="ds_in_dataset">In dataset</div>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--display,inherit)"><span id="stagedCount">0</span> <span data-i18n="ds_frames_word">frames</span></div>
+    </div>
+    <div class="result-card-actions" style="margin:0">
+        <a href="/api/dataset/export" class="btn btn-primary btn-sm" download data-i18n="ds_export_zip">Export zip (Roboflow)</a>
+        <button id="btnRoboflow" class="btn btn-sm" data-i18n="ds_upload_roboflow">Upload to Roboflow…</button>
+        <button id="btnArchive" class="btn btn-sm" data-i18n="ds_archive">Archive</button>
+        <button id="btnClear" class="btn btn-sm" data-i18n="ds_clear">Clear</button>
+    </div>
+</div>
+
+<div id="roboflowForm" class="card" style="display:none">
+    <h3 style="margin-top:0" data-i18n="ds_rf_title">Upload to an existing Roboflow project</h3>
+    <p class="page-desc" style="margin-top:0"><span data-i18n="ds_rf_desc_1">Crops + draft labels will be added to your project. Requires</span> <code>pip install roboflow</code>.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+        <input id="rfKey" class="form-input" placeholder="API key" type="password">
+        <input id="rfWorkspace" class="form-input" placeholder="workspace">
+        <input id="rfProject" class="form-input" placeholder="project">
+    </div>
+    <button id="btnRfUpload" class="btn btn-primary btn-sm" data-i18n="ds_upload">Upload</button>
+    <span id="rfStatus" style="margin-left:.75rem;color:var(--text-muted)"></span>
+</div>
+
+<div id="archivesSection" style="display:none">
+    <h2 style="margin:1.5rem 0 .75rem" data-i18n="ds_archives">Archives</h2>
+    <div id="archivesList"></div>
+</div>
+
+<div id="pendingSection" style="display:none">
+    <h2 style="margin:1.5rem 0 .75rem" data-i18n="ds_pending">Runs pending to add</h2>
+    <div id="pendingList"></div>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:1.5rem 0 .75rem;flex-wrap:wrap">
+    <h2 style="margin:0" data-i18n="ds_frames_in">Frames in the dataset</h2>
+    <div class="result-card-actions" style="margin:0">
+        <span id="selInfo" style="color:var(--text-muted);align-self:center" data-i18n="ds_click_select">Click a frame to select</span>
+        <button id="btnDelSel" class="btn btn-sm" style="display:none" data-i18n="ds_del_selected">Delete selected</button>
+        <button id="btnDeselect" class="btn btn-sm" style="display:none" data-i18n="ds_deselect">Clear selection</button>
+    </div>
+</div>
+<div id="gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.4rem"></div>
+<div id="galleryEmpty" class="card" style="display:none;text-align:center;color:var(--text-muted)" data-i18n="ds_empty">
+    Empty for now. Process a video and add its frames above.
+</div>
+<div style="text-align:center;margin:1rem 0">
+    <button id="btnMore" class="btn btn-sm" style="display:none" data-i18n="ds_show_more">Show more</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const t = (k, v) => window.PSF_I18N ? window.PSF_I18N.t(k, v) : k;
+let galleryOffset = 0;
+let galleryTotal = 0;
+const selected = new Set();
+
+function updateSelBar() {
+    const n = selected.size;
+    document.getElementById('btnDelSel').style.display = n ? '' : 'none';
+    document.getElementById('btnDeselect').style.display = n ? '' : 'none';
+    document.getElementById('selInfo').textContent = n ? t('ds_selected_n', {n}) : t('ds_click_select');
+}
+
+async function loadOverview() {
+    const r = await fetch('/api/dataset/overview');
+    const d = await r.json();
+    document.getElementById('stagedCount').textContent = d.staged;
+
+    const sec = document.getElementById('pendingSection');
+    const list = document.getElementById('pendingList');
+    if (d.pending && d.pending.length) {
+        sec.style.display = '';
+        list.innerHTML = d.pending.map(p => `
+            <div class="card result-card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+                <div><span class="result-job-id">${p.job_id}</span>
+                     <span style="color:var(--text-muted);margin-left:.5rem">${p.count} ${t('ds_frames_word')}</span></div>
+                <button class="btn btn-primary btn-sm" data-add="${p.job_id}">${t('ds_add_to')}</button>
+            </div>`).join('');
+        list.querySelectorAll('[data-add]').forEach(b => {
+            b.onclick = async () => {
+                b.disabled = true; b.textContent = t('ds_adding');
+                await fetch('/api/dataset/add/' + b.dataset.add, {method:'POST'});
+                await refresh();
+            };
+        });
+    } else {
+        sec.style.display = 'none';
+    }
+}
+
+async function loadGallery(reset) {
+    if (reset) { galleryOffset = 0; document.getElementById('gallery').innerHTML = ''; }
+    const r = await fetch(`/api/dataset/images?offset=${galleryOffset}&limit=120`);
+    const d = await r.json();
+    galleryTotal = d.total;
+    const g = document.getElementById('gallery');
+    for (const name of d.names) {
+        const img = document.createElement('img');
+        img.src = '/api/dataset/img/' + encodeURIComponent(name);
+        img.loading = 'lazy';
+        img.dataset.name = name;
+        img.style.cssText = 'width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:4px;background:var(--bg-card);cursor:pointer;outline:2px solid transparent;outline-offset:-2px';
+        img.title = name;
+        img.onclick = () => {
+            if (selected.has(name)) { selected.delete(name); img.style.outlineColor = 'transparent'; img.style.opacity = '1'; }
+            else { selected.add(name); img.style.outlineColor = 'var(--primary,#FF6300)'; img.style.opacity = '.6'; }
+            updateSelBar();
+        };
+        g.appendChild(img);
+    }
+    galleryOffset += d.names.length;
+    document.getElementById('galleryEmpty').style.display = galleryTotal ? 'none' : '';
+    document.getElementById('btnMore').style.display = galleryOffset < galleryTotal ? '' : 'none';
+}
+
+async function loadArchives() {
+    const arr = await (await fetch('/api/dataset/archives')).json();
+    const sec = document.getElementById('archivesSection');
+    const list = document.getElementById('archivesList');
+    if (!arr.length) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    list.innerHTML = arr.map(a => `
+        <div class="card result-card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+            <div><span class="result-job-id">${a.name}</span>
+                 <span style="color:var(--text-muted);margin-left:.5rem">${a.count} ${t('ds_frames_word')}</span></div>
+            <div class="result-card-actions" style="margin:0">
+                <a class="btn btn-sm" href="/api/dataset/archive_export/${a.name}" download>${t('ds_download_zip')}</a>
+                <button class="btn btn-sm" data-del="${a.name}">${t('ds_delete')}</button>
+            </div>
+        </div>`).join('');
+    list.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+        if (!confirm(t('ds_confirm_del_archive', {name: b.dataset.del}))) return;
+        await fetch('/api/dataset/archive_delete/' + b.dataset.del, {method:'POST'});
+        loadArchives();
+    });
+}
+
+async function refresh() { selected.clear(); updateSelBar(); await loadOverview(); await loadGallery(true); await loadArchives(); }
+
+document.getElementById('btnMore').onclick = () => loadGallery(false);
+document.getElementById('btnDeselect').onclick = () => { selected.clear(); updateSelBar(); loadGallery(true); };
+document.getElementById('btnDelSel').onclick = async () => {
+    const n = selected.size;
+    if (!n || !confirm(t('ds_confirm_del_frames', {n}))) return;
+    await fetch('/api/dataset/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({names:[...selected]})});
+    await refresh();
+};
+document.getElementById('btnRoboflow').onclick = () => {
+    const f = document.getElementById('roboflowForm');
+    f.style.display = f.style.display === 'none' ? '' : 'none';
+};
+document.getElementById('btnArchive').onclick = async () => {
+    if (!confirm(t('ds_confirm_archive'))) return;
+    const r = await (await fetch('/api/dataset/archive', {method:'POST'})).json();
+    if (r.error) { alert(r.error); return; }
+    await refresh();
+};
+document.getElementById('btnClear').onclick = async () => {
+    if (!confirm(t('ds_confirm_clear'))) return;
+    await fetch('/api/dataset/clear', {method:'POST'});
+    await refresh();
+};
+document.getElementById('btnRfUpload').onclick = async () => {
+    const s = document.getElementById('rfStatus');
+    s.textContent = t('ds_loading');
+    const body = {
+        api_key: document.getElementById('rfKey').value,
+        workspace: document.getElementById('rfWorkspace').value,
+        project: document.getElementById('rfProject').value,
+    };
+    const r = await fetch('/api/dataset/roboflow', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    s.textContent = d.error ? t('ds_error', {e: d.error}) : t('ds_uploaded', {n: d.uploaded});
+};
+
+// Re-render dynamic (JS-built) text when the language is toggled.
+if (window.PSF_I18N) window.PSF_I18N.onChange(() => { updateSelBar(); loadOverview(); loadArchives(); });
+
+refresh();
+</script>
+{% endblock %}

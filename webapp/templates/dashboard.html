@@ -3,62 +3,66 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Дашборд</h1>
-    <p class="page-desc">Обзор всех обработанных матчей и статистики игроков</p>
+    <h1 data-i18n="db_title">Дашборд</h1>
+    <p class="page-desc" data-i18n="db_desc">Обзор всех обработанных матчей и статистики игроков</p>
 </div>
 
 <div class="dashboard-summary" id="summary-cards">
     <div class="summary-card">
         <div class="summary-value" id="total-datasets">{{ datasets|length }}</div>
-        <div class="summary-label">Датасетов</div>
+        <div class="summary-label" data-i18n="db_datasets">Датасетов</div>
     </div>
     <div class="summary-card">
         <div class="summary-value" id="total-players">—</div>
-        <div class="summary-label">Уникальных игроков</div>
+        <div class="summary-label" data-i18n="db_players">Уникальных игроков</div>
     </div>
     <div class="summary-card">
         <div class="summary-value" id="total-records">—</div>
-        <div class="summary-label">Записей</div>
+        <div class="summary-label" data-i18n="db_records">Записей</div>
     </div>
     <div class="summary-card">
         <div class="summary-value" id="total-distance">—</div>
-        <div class="summary-label">Суммарная дистанция (м)</div>
+        <div class="summary-label" data-i18n="db_distance">Суммарная дистанция (м)</div>
     </div>
 </div>
 
 <div class="dashboard-grid">
     <div class="card card-wide">
-        <h3 class="card-title">Датасеты</h3>
+        <h3 class="card-title" data-i18n="db_datasets_title">Датасеты</h3>
         <div class="dataset-list" id="dataset-list">
             {% for name, records in datasets.items() %}
             <div class="dataset-item" data-name="{{ name }}">
                 <div class="dataset-info">
                     <span class="dataset-name">{{ name }}</span>
-                    <span class="dataset-count">{{ records|length }} записей</span>
+                    <span class="dataset-count"><span data-count-value>{{ records|length }}</span> <span data-i18n="db_records_count">записей</span></span>
                 </div>
-                <button class="btn btn-sm btn-outline" onclick="loadDataset('{{ name }}')">Подробнее</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDataset('{{ name }}')" data-i18n="db_details">Подробнее</button>
             </div>
             {% endfor %}
             {% if not datasets %}
             <div class="empty-state">
-                <p>Нет обработанных датасетов. <a href="{{ url_for('upload') }}">Загрузите видео</a> для начала анализа.</p>
+                <p>
+                    <span data-i18n="db_empty_prefix">Нет обработанных датасетов.</span>
+                    <a href="{{ url_for('upload') }}" data-i18n="db_empty_link">Загрузите видео</a>
+                    <span data-i18n="db_empty_suffix">для начала анализа.</span>
+                </p>
             </div>
             {% endif %}
         </div>
     </div>
 
     <div class="card">
-        <h3 class="card-title">Распределение по командам</h3>
+        <h3 class="card-title" data-i18n="db_team_dist">Распределение по командам</h3>
         <canvas id="teamChart" height="250"></canvas>
     </div>
 
     <div class="card">
-        <h3 class="card-title">Топ-10: Время на льду</h3>
+        <h3 class="card-title" data-i18n="db_top_time">Топ-10: Время на льду</h3>
         <canvas id="timeChart" height="250"></canvas>
     </div>
 
     <div class="card">
-        <h3 class="card-title">Топ-10: Дистанция</h3>
+        <h3 class="card-title" data-i18n="db_top_dist">Топ-10: Дистанция</h3>
         <canvas id="distanceChart" height="250"></canvas>
     </div>
 </div>
@@ -67,7 +71,7 @@
 <div class="modal-overlay" id="datasetModal">
     <div class="modal">
         <div class="modal-header">
-            <h3 id="modal-title">Датасет</h3>
+            <h3 id="modal-title" data-i18n="db_modal_dataset">Датасет</h3>
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="modal-body">
@@ -75,11 +79,11 @@
                 <table class="data-table" id="modal-table">
                     <thead>
                         <tr>
-                            <th>Имя</th>
-                            <th>Номер</th>
-                            <th>Команда</th>
-                            <th>Время (с)</th>
-                            <th>Дистанция (м)</th>
+                            <th data-i18n="db_col_name">Имя</th>
+                            <th data-i18n="db_col_number">Номер</th>
+                            <th data-i18n="db_col_team">Команда</th>
+                            <th data-i18n="db_col_time">Время (с)</th>
+                            <th data-i18n="db_col_dist">Дистанция (м)</th>
                         </tr>
                     </thead>
                     <tbody id="modal-tbody"></tbody>
@@ -97,6 +101,7 @@
 {% block scripts %}
 <script>
 const allDatasets = {{ datasets|tojson }};
+let __dbCharts = [];
 
 // Compute summary
 let totalRecords = 0, totalDistance = 0, playerNames = new Set();
@@ -119,17 +124,6 @@ for (const records of Object.values(allDatasets)) {
         teamCounts[t] = (teamCounts[t] || 0) + 1;
     }
 }
-new Chart(document.getElementById('teamChart'), {
-    type: 'doughnut',
-    data: {
-        labels: Object.keys(teamCounts),
-        datasets: [{
-            data: Object.values(teamCounts),
-            backgroundColor: ['#3b82f6', '#ef4444', '#6b7280', '#10b981'],
-        }]
-    },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-});
 
 // Aggregate all players
 function aggregateAll(datasets) {
@@ -152,53 +146,100 @@ const top10Time = allAgg.slice(0, 10);
 const top10Dist = [...allAgg].sort((a, b) => b['Distance (m)'] - a['Distance (m)']).slice(0, 10);
 
 function teamColor(team) {
-    if (team === 'Home') return '#3b82f6';
-    if (team === 'Away') return '#ef4444';
-    return '#6b7280';
+    if (team === 'Home') return '#4A90D9';
+    if (team === 'Away') return '#FF6300';
+    return '#9AA4AD';
 }
 
-new Chart(document.getElementById('timeChart'), {
-    type: 'bar',
-    data: {
-        labels: top10Time.map(p => p.Name),
-        datasets: [{
-            label: 'Время (с)',
-            data: top10Time.map(p => p['Time (s)']),
-            backgroundColor: top10Time.map(p => teamColor(p.Team)),
-        }]
-    },
-    options: {
-        indexAxis: 'y', responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { x: { title: { display: true, text: 'Секунды' } } }
-    }
-});
+function renderMainCharts() {
+    __dbCharts.forEach(c => c.destroy());
+    __dbCharts = [];
 
-new Chart(document.getElementById('distanceChart'), {
-    type: 'bar',
-    data: {
-        labels: top10Dist.map(p => p.Name),
-        datasets: [{
-            label: 'Дистанция (м)',
-            data: top10Dist.map(p => p['Distance (m)']),
-            backgroundColor: top10Dist.map(p => teamColor(p.Team)),
-        }]
-    },
-    options: {
-        indexAxis: 'y', responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { x: { title: { display: true, text: 'Метры' } } }
-    }
-});
+    __dbCharts.push(new Chart(document.getElementById('teamChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(teamCounts),
+            datasets: [{
+                data: Object.values(teamCounts),
+                backgroundColor: ['#4A90D9', '#FF6300', '#9AA4AD', '#6B7580'],
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    }));
+
+    __dbCharts.push(new Chart(document.getElementById('timeChart'), {
+        type: 'bar',
+        data: {
+            labels: top10Time.map(p => p.Name),
+            datasets: [{
+                label: PSF_I18N.t('db_chart_time_label'),
+                data: top10Time.map(p => p['Time (s)']),
+                backgroundColor: top10Time.map(p => teamColor(p.Team)),
+            }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { title: { display: true, text: PSF_I18N.t('db_chart_seconds') } } }
+        }
+    }));
+
+    __dbCharts.push(new Chart(document.getElementById('distanceChart'), {
+        type: 'bar',
+        data: {
+            labels: top10Dist.map(p => p.Name),
+            datasets: [{
+                label: PSF_I18N.t('db_chart_dist_label'),
+                data: top10Dist.map(p => p['Distance (m)']),
+                backgroundColor: top10Dist.map(p => teamColor(p.Team)),
+            }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { title: { display: true, text: PSF_I18N.t('db_chart_meters') } } }
+        }
+    }));
+}
+
+document.addEventListener('DOMContentLoaded', renderMainCharts);
 
 // Modal
 let modalCharts = [];
+let __modalData = null;
+let __modalName = null;
+
+function renderModalCharts() {
+    if (!__modalData) return;
+    modalCharts.forEach(c => c.destroy());
+    modalCharts = [];
+    const named = __modalData.aggregated.filter(r => r.Name);
+    modalCharts.push(new Chart(document.getElementById('modalTimeChart'), {
+        type: 'bar',
+        data: {
+            labels: named.map(p => p.Name),
+            datasets: [{ label: PSF_I18N.t('db_chart_time_label'), data: named.map(p => p['Time (s)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false }, title: { display: true, text: PSF_I18N.t('db_chart_time') } } }
+    }));
+    modalCharts.push(new Chart(document.getElementById('modalDistChart'), {
+        type: 'bar',
+        data: {
+            labels: named.map(p => p.Name),
+            datasets: [{ label: PSF_I18N.t('db_chart_dist_label'), data: named.map(p => p['Distance (m)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false }, title: { display: true, text: PSF_I18N.t('db_chart_dist') } } }
+    }));
+}
 
 async function loadDataset(name) {
     const resp = await fetch('/api/dataset/' + encodeURIComponent(name));
     const data = await resp.json();
+    __modalData = data;
+    __modalName = name;
     const modal = document.getElementById('datasetModal');
     document.getElementById('modal-title').textContent = name;
+    document.getElementById('modal-title').removeAttribute('data-i18n');
 
     const tbody = document.getElementById('modal-tbody');
     tbody.innerHTML = '';
@@ -214,30 +255,15 @@ async function loadDataset(name) {
         tbody.appendChild(tr);
     }
 
-    // Destroy old charts
-    modalCharts.forEach(c => c.destroy());
-    modalCharts = [];
-
-    const named = data.aggregated.filter(r => r.Name);
-    modalCharts.push(new Chart(document.getElementById('modalTimeChart'), {
-        type: 'bar',
-        data: {
-            labels: named.map(p => p.Name),
-            datasets: [{ label: 'Время (с)', data: named.map(p => p['Time (s)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false }, title: { display: true, text: 'Время на льду' } } }
-    }));
-
-    modalCharts.push(new Chart(document.getElementById('modalDistChart'), {
-        type: 'bar',
-        data: {
-            labels: named.map(p => p.Name),
-            datasets: [{ label: 'Дистанция (м)', data: named.map(p => p['Distance (m)']), backgroundColor: named.map(p => teamColor(p.Team)) }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false }, title: { display: true, text: 'Пройденная дистанция' } } }
-    }));
-
+    renderModalCharts();
     modal.classList.add('active');
+}
+
+if (window.PSF_I18N) {
+    PSF_I18N.onChange(() => {
+        renderMainCharts();
+        if (__modalData) renderModalCharts();
+    });
 }
 
 function closeModal() {

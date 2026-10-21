@@ -60,3 +60,15 @@ ipynb:excel/
 
 # ===== Examples (large videos) =====
 examples/
+
+# ===== Installer build artefacts =====
+webapp/build/
+webapp/dist/
+webapp/packaging/icon.iconset/
+webapp/packaging/MicrosoftEdgeWebview2Setup.exe
+
+# ===== Local tooling and generated data =====
+.claude/
+*.bak
+webapp/training_dataset/
+webapp/yolo26n-cls.pt

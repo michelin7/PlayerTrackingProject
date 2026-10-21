@@ -1,0 +1,53 @@
+name: build installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10" }
+      - run: |
+          test -f models/Player_Detection.pt || { echo "models/ missing (Git LFS?)"; exit 1; }
+          pip install -r webapp/requirements.txt pywebview pyinstaller
+          brew install create-dmg
+      - run: PY=python bash webapp/packaging/build_macos.sh
+      - name: selftest
+        run: "'webapp/dist/Player Scouting & Fitness.app/Contents/MacOS/PSF' --selftest"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PSF-macOS
+          path: webapp/dist/PSF-macOS.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10" }
+      - run: pip install -r webapp/requirements.txt pywebview pyinstaller
+      - name: WebView2 bootstrapper
+        run: curl -L -o webapp/packaging/MicrosoftEdgeWebview2Setup.exe https://go.microsoft.com/fwlink/p/?LinkId=2124703
+      - run: |
+          cd webapp
+          python tools/make_icons.py
+          python -m PyInstaller packaging/psf.spec --noconfirm
+      - name: selftest
+        run: |
+          $p = Start-Process -FilePath "webapp\dist\PSF\PSF.exe" -ArgumentList "--selftest" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content webapp\dist\PSF\psf_selftest.log; exit 1 }
+      - name: installer
+        run: |
+          cd webapp/packaging
+          & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" psf.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PSF-Windows
+          path: webapp/dist/PSF-Setup.exe

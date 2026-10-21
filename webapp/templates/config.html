@@ -3,21 +3,21 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Конфигурация матча</h1>
-    <p class="page-desc">Создайте или загрузите конфигурацию команд с разбивкой по парам защитников и тройкам нападающих</p>
+    <h1 data-i18n="cfg_page_title">Конфигурация матча</h1>
+    <p class="page-desc" data-i18n="cfg_page_desc">Создайте или загрузите конфигурацию команд с разбивкой по парам защитников и тройкам нападающих</p>
 </div>
 
 <div class="cfg-wrapper">
     <!-- Saved configs selector -->
     <div class="card cfg-saved-card">
         <div class="cfg-saved-header">
-            <h3 class="card-title">Сохраненные конфигурации</h3>
+            <h3 class="card-title" data-i18n="cfg_saved_title">Сохранённые конфигурации</h3>
             <div class="cfg-saved-actions">
                 <select id="savedConfigSelect" class="form-select">
-                    <option value="">— Новая конфигурация —</option>
+                    <option value="" data-i18n="cfg_saved_new">— Новая конфигурация —</option>
                 </select>
-                <button type="button" class="btn btn-outline btn-sm" onclick="loadSelectedConfig()">Загрузить</button>
-                <button type="button" class="btn btn-outline btn-sm btn-danger-outline" onclick="deleteSelectedConfig()">Удалить</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="loadSelectedConfig()" data-i18n="cfg_load">Загрузить</button>
+                <button type="button" class="btn btn-outline btn-sm btn-danger-outline" onclick="deleteSelectedConfig()" data-i18n="cfg_delete">Удалить</button>
             </div>
         </div>
     </div>
@@ -25,8 +25,8 @@
     <!-- Config name -->
     <div class="card">
         <div class="form-group">
-            <label>Название конфигурации</label>
-            <input type="text" id="configName" class="form-input" placeholder="Например: Динамо vs Локомотив 2025-03-15">
+            <label data-i18n="cfg_name_label">Название конфигурации</label>
+            <input type="text" id="configName" class="form-input" placeholder="Например: Динамо vs Локомотив 2025-03-15" data-i18n-placeholder="cfg_name_placeholder">
         </div>
     </div>
 
@@ -35,24 +35,26 @@
         <!-- HOME TEAM -->
         <div class="card cfg-team-card">
             <div class="cfg-team-header cfg-home">
-                <h3>Home</h3>
+                <h3 data-i18n="cfg_home">Home</h3>
                 <div class="form-group form-group-inline">
-                    <label>Вратарь(и) #</label>
+                    <label data-i18n="cfg_goalies">Вратарь(и) #</label>
                     <input type="text" id="homeGoalies" class="form-input form-input-sm" placeholder="31, 35">
                 </div>
             </div>
-            <div class="cfg-color-picker-section">
-                <label class="cfg-color-label">Основной цвет формы</label>
-                <div class="cfg-color-swatches" id="homePrimaryColor"></div>
-                <label class="cfg-color-label" style="margin-top:0.5rem">Дополнительный цвет (необязательно)</label>
-                <div class="cfg-color-swatches" id="homeSecondaryColor"></div>
+            <div class="cfg-shade-section">
+                <label class="cfg-color-label" data-i18n="cfg_jersey_shade">Тон формы</label>
+                <div class="cfg-shade-toggle" id="homeShade">
+                    <button type="button" class="cfg-shade-btn" data-shade="light" data-i18n="cfg_shade_light">Светлая</button>
+                    <button type="button" class="cfg-shade-btn" data-shade="dark" data-i18n="cfg_shade_dark">Тёмная</button>
+                </div>
+                <p class="cfg-shade-hint" data-i18n="cfg_shade_hint">Команды различаются по яркости формы — светлая против тёмной</p>
             </div>
 
             <!-- Defense pairs -->
             <div class="cfg-section">
                 <div class="cfg-section-header">
-                    <h4>Защитники (пары)</h4>
-                    <button type="button" class="btn btn-sm btn-outline" onclick="addPair('home')">+ Пара</button>
+                    <h4 data-i18n="cfg_def_section">Защитники (пары)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addPair('home')" data-i18n="cfg_add_pair">+ Пара</button>
                 </div>
                 <div id="homeDefPairs" class="cfg-pairs-container">
                     <!-- Filled dynamically -->
@@ -62,8 +64,8 @@
             <!-- Forward lines -->
             <div class="cfg-section">
                 <div class="cfg-section-header">
-                    <h4>Нападающие (тройки)</h4>
-                    <button type="button" class="btn btn-sm btn-outline" onclick="addLine('home')">+ Тройка</button>
+                    <h4 data-i18n="cfg_fwd_section">Нападающие (тройки)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addLine('home')" data-i18n="cfg_add_line">+ Тройка</button>
                 </div>
                 <div id="homeFwdLines" class="cfg-lines-container">
                     <!-- Filled dynamically -->
@@ -74,24 +76,26 @@
         <!-- AWAY TEAM -->
         <div class="card cfg-team-card">
             <div class="cfg-team-header cfg-away">
-                <h3>Away</h3>
+                <h3 data-i18n="cfg_away">Away</h3>
                 <div class="form-group form-group-inline">
-                    <label>Вратарь(и) #</label>
+                    <label data-i18n="cfg_goalies">Вратарь(и) #</label>
                     <input type="text" id="awayGoalies" class="form-input form-input-sm" placeholder="30, 33">
                 </div>
             </div>
-            <div class="cfg-color-picker-section">
-                <label class="cfg-color-label">Основной цвет формы</label>
-                <div class="cfg-color-swatches" id="awayPrimaryColor"></div>
-                <label class="cfg-color-label" style="margin-top:0.5rem">Дополнительный цвет (необязательно)</label>
-                <div class="cfg-color-swatches" id="awaySecondaryColor"></div>
+            <div class="cfg-shade-section">
+                <label class="cfg-color-label" data-i18n="cfg_jersey_shade">Тон формы</label>
+                <div class="cfg-shade-toggle" id="awayShade">
+                    <button type="button" class="cfg-shade-btn" data-shade="light" data-i18n="cfg_shade_light">Светлая</button>
+                    <button type="button" class="cfg-shade-btn" data-shade="dark" data-i18n="cfg_shade_dark">Тёмная</button>
+                </div>
+                <p class="cfg-shade-hint" data-i18n="cfg_shade_hint">Команды различаются по яркости формы — светлая против тёмной</p>
             </div>
 
             <!-- Defense pairs -->
             <div class="cfg-section">
                 <div class="cfg-section-header">
-                    <h4>Защитники (пары)</h4>
-                    <button type="button" class="btn btn-sm btn-outline" onclick="addPair('away')">+ Пара</button>
+                    <h4 data-i18n="cfg_def_section">Защитники (пары)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addPair('away')" data-i18n="cfg_add_pair">+ Пара</button>
                 </div>
                 <div id="awayDefPairs" class="cfg-pairs-container">
                     <!-- Filled dynamically -->
@@ -101,8 +105,8 @@
             <!-- Forward lines -->
             <div class="cfg-section">
                 <div class="cfg-section-header">
-                    <h4>Нападающие (тройки)</h4>
-                    <button type="button" class="btn btn-sm btn-outline" onclick="addLine('away')">+ Тройка</button>
+                    <h4 data-i18n="cfg_fwd_section">Нападающие (тройки)</h4>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addLine('away')" data-i18n="cfg_add_line">+ Тройка</button>
                 </div>
                 <div id="awayFwdLines" class="cfg-lines-container">
                     <!-- Filled dynamically -->
@@ -115,7 +119,10 @@
     <div class="cfg-bottom-bar">
         <div class="cfg-summary" id="cfgSummary"></div>
         <div class="cfg-actions">
-            <button type="button" class="btn btn-primary btn-lg" id="saveConfigBtn" onclick="saveConfig()">Сохранить конфигурацию</button>
+            <input type="file" id="importConfigFile" accept=".json,application/json" style="display:none" onchange="importConfig(this)">
+            <button type="button" class="btn btn-outline btn-lg" onclick="document.getElementById('importConfigFile').click()" data-i18n="cfg_import">Импорт</button>
+            <button type="button" class="btn btn-outline btn-lg" onclick="downloadConfig()" data-i18n="cfg_download">Скачать</button>
+            <button type="button" class="btn btn-primary btn-lg" id="saveConfigBtn" onclick="saveConfig()" data-i18n="cfg_save">Сохранить конфигурацию</button>
         </div>
     </div>
 </div>
@@ -149,67 +156,55 @@ const COLOR_PALETTE = [
     { name: 'brown',   rgb: [165, 42, 42],   css: '#92400e',  textColor: '#fff' },
 ];
 
-function initColorSwatches(primaryId, secondaryId, defaultPrimary, defaultSecondary) {
-    for (const [containerId, defaultColor] of [[primaryId, defaultPrimary], [secondaryId, defaultSecondary]]) {
-        const container = document.getElementById(containerId);
-        container.innerHTML = '';
-        // Add "none" option for secondary
-        if (containerId === secondaryId) {
-            const none = document.createElement('button');
-            none.type = 'button';
-            none.className = 'cfg-swatch cfg-swatch-none' + (!defaultColor ? ' selected' : '');
-            none.dataset.color = '';
-            none.innerHTML = `<span class="cfg-swatch-check">&#10003;</span><span class="cfg-swatch-name">нет</span>`;
-            none.addEventListener('click', () => {
-                container.querySelectorAll('.cfg-swatch').forEach(s => s.classList.remove('selected'));
-                none.classList.add('selected');
-            });
-            container.appendChild(none);
-        }
-        for (const color of COLOR_PALETTE) {
-            const swatch = document.createElement('button');
-            swatch.type = 'button';
-            swatch.className = 'cfg-swatch';
-            if (defaultColor === color.name) swatch.classList.add('selected');
-            swatch.style.setProperty('--swatch-bg', color.css);
-            swatch.style.setProperty('--swatch-text', color.textColor);
-            swatch.dataset.color = color.name;
-            swatch.innerHTML = `<span class="cfg-swatch-check">&#10003;</span><span class="cfg-swatch-name">${color.name}</span>`;
-            swatch.addEventListener('click', () => {
-                container.querySelectorAll('.cfg-swatch').forEach(s => s.classList.remove('selected'));
-                swatch.classList.add('selected');
-            });
-            container.appendChild(swatch);
-        }
-    }
+// Team classification is by jersey brightness (light vs dark), so the config
+// only needs the shade, not a specific hue. We persist it as a color name the
+// backend already knows the brightness of: light -> white, dark -> black.
+const SHADE_TO_COLOR = { light: 'white', dark: 'black' };
+
+// Perceived luminance (0..255) of a palette color — used to infer the shade
+// of older configs that stored an explicit color (e.g. "blue" -> dark).
+function colorLuminance(name) {
+    const pal = COLOR_PALETTE.find(p => p.name === name);
+    if (!pal) return 128;
+    const [r, g, b] = pal.rgb;
+    return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-function getSelectedColors(primaryId, secondaryId) {
-    const colors = [];
-    const prim = document.getElementById(primaryId).querySelector('.cfg-swatch.selected');
-    if (prim && prim.dataset.color) colors.push(prim.dataset.color);
-    const sec = document.getElementById(secondaryId).querySelector('.cfg-swatch.selected');
-    if (sec && sec.dataset.color) colors.push(sec.dataset.color);
-    return colors;
-}
-
-function setSelectedColor(containerId, color) {
-    const container = document.getElementById(containerId);
-    container.querySelectorAll('.cfg-swatch').forEach(s => {
-        if (!color && s.dataset.color === '') {
-            s.classList.add('selected');
-        } else {
-            s.classList.toggle('selected', s.dataset.color === color);
-        }
+function initShadeToggle(toggleId, defaultShade) {
+    const toggle = document.getElementById(toggleId);
+    toggle.querySelectorAll('.cfg-shade-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.shade === defaultShade);
+        btn.onclick = () => {
+            toggle.querySelectorAll('.cfg-shade-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            updateSummary();
+        };
     });
+}
+
+function getShade(toggleId) {
+    const sel = document.getElementById(toggleId).querySelector('.cfg-shade-btn.selected');
+    return sel ? sel.dataset.shade : 'dark';
+}
+
+function getShadeColors(toggleId) {
+    return [SHADE_TO_COLOR[getShade(toggleId)]];
+}
+
+function setShade(toggleId, colorsArr) {
+    // Infer shade from stored colors: light if the primary color is bright.
+    const primary = (Array.isArray(colorsArr) ? colorsArr[0] : colorsArr) || 'black';
+    const shade = colorLuminance(primary) >= 128 ? 'light' : 'dark';
+    initShadeToggle(toggleId, shade);
 }
 
 // ========== Pair / Line templates ==========
 
 function createPlayerInput(num, name) {
+    const ph = window.PSF_I18N ? PSF_I18N.t('cfg_player_name_ph') : 'Фамилия Имя';
     return `<div class="cfg-player-input">
         <input type="text" class="form-input form-input-num" placeholder="#" value="${num || ''}" maxlength="2">
-        <input type="text" class="form-input form-input-name" placeholder="Фамилия Имя" value="${name || ''}">
+        <input type="text" class="form-input form-input-name" placeholder="${ph}" value="${name || ''}">
     </div>`;
 }
 
@@ -217,17 +212,19 @@ function addPair(side, p1Num, p1Name, p2Num, p2Name) {
     const container = document.getElementById(side + 'DefPairs');
     const count = container.querySelectorAll('.cfg-pair').length;
     if (count >= MAX_DEF_PAIRS) {
-        showToast('Максимум ' + MAX_DEF_PAIRS + ' пары защитников', 'warning');
+        showToast(PSF_I18N.t('cfg_err_max_pairs', {n: MAX_DEF_PAIRS}), 'warning');
         return;
     }
     pairCounters[side]++;
     const idx = pairCounters[side];
     const div = document.createElement('div');
     div.className = 'cfg-pair';
+    const pairLabel = PSF_I18N.t('cfg_pair_label');
+    const removeTitle = PSF_I18N.t('cfg_remove_title');
     div.innerHTML = `
         <div class="cfg-pair-header">
-            <span class="cfg-pair-label">Пара ${count + 1}</span>
-            <button type="button" class="btn-icon btn-remove" onclick="this.closest('.cfg-pair').remove(); renumber('${side}')" title="Удалить">&times;</button>
+            <span class="cfg-pair-label">${pairLabel} ${count + 1}</span>
+            <button type="button" class="btn-icon btn-remove" onclick="this.closest('.cfg-pair').remove(); renumber('${side}')" title="${removeTitle}">&times;</button>
         </div>
         <div class="cfg-pair-players">
             ${createPlayerInput(p1Num, p1Name)}
@@ -242,16 +239,18 @@ function addLine(side, p1Num, p1Name, p2Num, p2Name, p3Num, p3Name) {
     const container = document.getElementById(side + 'FwdLines');
     const count = container.querySelectorAll('.cfg-line').length;
     if (count >= MAX_FWD_LINES) {
-        showToast('Максимум ' + MAX_FWD_LINES + ' тройки нападающих', 'warning');
+        showToast(PSF_I18N.t('cfg_err_max_lines', {n: MAX_FWD_LINES}), 'warning');
         return;
     }
     lineCounters[side]++;
     const div = document.createElement('div');
     div.className = 'cfg-line';
+    const lineLabel = PSF_I18N.t('cfg_line_label');
+    const removeTitle = PSF_I18N.t('cfg_remove_title');
     div.innerHTML = `
         <div class="cfg-pair-header">
-            <span class="cfg-pair-label">Тройка ${count + 1}</span>
-            <button type="button" class="btn-icon btn-remove" onclick="this.closest('.cfg-line').remove(); renumber('${side}')" title="Удалить">&times;</button>
+            <span class="cfg-pair-label">${lineLabel} ${count + 1}</span>
+            <button type="button" class="btn-icon btn-remove" onclick="this.closest('.cfg-line').remove(); renumber('${side}')" title="${removeTitle}">&times;</button>
         </div>
         <div class="cfg-line-players">
             ${createPlayerInput(p1Num, p1Name)}
@@ -264,15 +263,17 @@ function addLine(side, p1Num, p1Name, p2Num, p2Name, p3Num, p3Name) {
 }
 
 function renumber(side) {
+    const pairLabel = PSF_I18N.t('cfg_pair_label');
+    const lineLabel = PSF_I18N.t('cfg_line_label');
     // Re-label pairs
     const pairs = document.querySelectorAll(`#${side}DefPairs .cfg-pair`);
     pairs.forEach((p, i) => {
-        p.querySelector('.cfg-pair-label').textContent = 'Пара ' + (i + 1);
+        p.querySelector('.cfg-pair-label').textContent = pairLabel + ' ' + (i + 1);
     });
     // Re-label lines
     const lines = document.querySelectorAll(`#${side}FwdLines .cfg-line`);
     lines.forEach((l, i) => {
-        l.querySelector('.cfg-pair-label').textContent = 'Тройка ' + (i + 1);
+        l.querySelector('.cfg-pair-label').textContent = lineLabel + ' ' + (i + 1);
     });
     updateSummary();
 }
@@ -318,8 +319,8 @@ function collectTeam(side) {
 }
 
 function buildConfig() {
-    const homeColorArr = getSelectedColors('homePrimaryColor', 'homeSecondaryColor');
-    const awayColorArr = getSelectedColors('awayPrimaryColor', 'awaySecondaryColor');
+    const homeColorArr = getShadeColors('homeShade');
+    const awayColorArr = getShadeColors('awayShade');
     const homeGoalies = document.getElementById('homeGoalies').value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
     const awayGoalies = document.getElementById('awayGoalies').value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
@@ -356,7 +357,46 @@ function updateSummary() {
     const homeCount = Object.keys(home.roster).length;
     const awayCount = Object.keys(away.roster).length;
     const el = document.getElementById('cfgSummary');
-    el.innerHTML = `Home: ${home.defPairs.length} пар + ${home.fwdLines.length} троек = <b>${homeCount}</b> игроков &nbsp;|&nbsp; Away: ${away.defPairs.length} пар + ${away.fwdLines.length} троек = <b>${awayCount}</b> игроков`;
+    el.innerHTML = PSF_I18N.t('cfg_summary_tmpl', {
+        hp: home.defPairs.length, hl: home.fwdLines.length, hc: `<b>${homeCount}</b>`,
+        ap: away.defPairs.length, al: away.fwdLines.length, ac: `<b>${awayCount}</b>`,
+    });
+}
+
+// ========== Download ==========
+
+function downloadConfig() {
+    const config = buildConfig();
+    const name = config.config_name || 'config';
+    const safe = name.replace(/[^\w .\-]+/g, '_').trim() || 'config';
+    const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = safe + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+function importConfig(input) {
+    const file = input.files && input.files[0];
+    input.value = '';                     // allow re-importing the same file
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        let cfg;
+        try { cfg = JSON.parse(reader.result); }
+        catch (e) { showToast(PSF_I18N.t('cfg_import_err'), 'danger'); return; }
+        editingConfigId = null;           // imported = a new config until saved
+        populateForm(cfg);
+        updateSaveButton();
+        document.getElementById('savedConfigSelect').value = '';
+        showToast(PSF_I18N.t('cfg_toast_imported'), 'success');
+    };
+    reader.onerror = () => showToast(PSF_I18N.t('cfg_import_err'), 'danger');
+    reader.readAsText(file);
 }
 
 // ========== Save / Load ==========
@@ -364,22 +404,22 @@ function updateSummary() {
 async function saveConfig() {
     const config = buildConfig();
     if (!config.config_name || config.config_name === 'Unnamed') {
-        showToast('Укажите название конфигурации', 'warning');
+        showToast(PSF_I18N.t('cfg_err_name'), 'warning');
         document.getElementById('configName').focus();
         return;
     }
     const hColors = config.teams_colors_info.Home;
     const aColors = config.teams_colors_info.Away;
     if (hColors.length === 0 || aColors.length === 0) {
-        showToast('Выберите основной цвет формы для обеих команд', 'warning');
+        showToast(PSF_I18N.t('cfg_err_colors'), 'warning');
         return;
     }
     if (hColors[0] === aColors[0]) {
-        showToast('Основные цвета команд не должны совпадать', 'warning');
+        showToast(PSF_I18N.t('cfg_err_same_color'), 'warning');
         return;
     }
     if (Object.keys(config.home_team).length === 0 && Object.keys(config.away_team).length === 0) {
-        showToast('Добавьте хотя бы одного игрока', 'warning');
+        showToast(PSF_I18N.t('cfg_err_empty'), 'warning');
         return;
     }
 
@@ -402,25 +442,27 @@ async function saveConfig() {
         const data = await resp.json();
         if (data.status === 'ok') {
             editingConfigId = data.id;
-            showToast('Конфигурация сохранена', 'success');
+            showToast(PSF_I18N.t('cfg_toast_saved'), 'success');
             loadConfigList().then(() => {
                 document.getElementById('savedConfigSelect').value = editingConfigId;
             });
             updateSaveButton();
         } else {
-            showToast('Ошибка: ' + (data.error || 'unknown'), 'danger');
+            showToast('Error: ' + (data.error || 'unknown'), 'danger');
         }
     } catch (e) {
-        showToast('Ошибка: ' + e.message, 'danger');
+        showToast('Error: ' + e.message, 'danger');
     }
 }
 
 function updateSaveButton() {
     const btn = document.getElementById('saveConfigBtn');
     if (editingConfigId && !editingConfigId.startsWith('legacy__')) {
-        btn.textContent = 'Сохранить изменения';
+        btn.textContent = PSF_I18N.t('cfg_save_changes');
+        btn.setAttribute('data-i18n', 'cfg_save_changes');
     } else {
-        btn.textContent = 'Сохранить конфигурацию';
+        btn.textContent = PSF_I18N.t('cfg_save');
+        btn.setAttribute('data-i18n', 'cfg_save');
     }
 }
 
@@ -430,7 +472,7 @@ async function loadConfigList() {
         const list = await resp.json();
         const select = document.getElementById('savedConfigSelect');
         const currentVal = select.value;
-        select.innerHTML = '<option value="">-- Новая конфигурация --</option>';
+        select.innerHTML = `<option value="">${PSF_I18N.t('cfg_saved_new')}</option>`;
         for (const cfg of list) {
             const opt = document.createElement('option');
             opt.value = cfg.id;
@@ -455,26 +497,26 @@ async function loadSelectedConfig() {
         editingConfigId = id;
         populateForm(cfg);
         updateSaveButton();
-        showToast('Конфигурация загружена для редактирования', 'success');
+        showToast(PSF_I18N.t('cfg_toast_loaded'), 'success');
     } catch (e) {
-        showToast('Ошибка загрузки: ' + e.message, 'danger');
+        showToast('Error: ' + e.message, 'danger');
     }
 }
 
 async function deleteSelectedConfig() {
     const id = document.getElementById('savedConfigSelect').value;
     if (!id) return;
-    if (!confirm('Удалить эту конфигурацию?')) return;
+    if (!confirm(PSF_I18N.t('cfg_delete_confirm'))) return;
     try {
         const resp = await fetch('/api/configs/' + id, { method: 'DELETE' });
         const data = await resp.json();
         if (data.status === 'ok') {
-            showToast('Конфигурация удалена', 'success');
+            showToast(PSF_I18N.t('cfg_toast_deleted'), 'success');
             clearForm();
             loadConfigList();
         }
     } catch (e) {
-        showToast('Ошибка: ' + e.message, 'danger');
+        showToast('Error: ' + e.message, 'danger');
     }
 }
 
@@ -482,10 +524,8 @@ function clearForm() {
     editingConfigId = null;
     updateSaveButton();
     document.getElementById('configName').value = '';
-    setSelectedColor('homePrimaryColor', 'blue');
-    setSelectedColor('homeSecondaryColor', '');
-    setSelectedColor('awayPrimaryColor', 'white');
-    setSelectedColor('awaySecondaryColor', '');
+    initShadeToggle('homeShade', 'dark');
+    initShadeToggle('awayShade', 'light');
     document.getElementById('homeGoalies').value = '';
     document.getElementById('awayGoalies').value = '';
     ['homeDefPairs', 'homeFwdLines', 'awayDefPairs', 'awayFwdLines'].forEach(id => {
@@ -501,14 +541,8 @@ function clearForm() {
 
 function populateForm(cfg) {
     document.getElementById('configName').value = cfg.config_name || '';
-    const homeC = cfg.teams_colors_info?.Home || ['blue'];
-    const awayC = cfg.teams_colors_info?.Away || ['white'];
-    const hArr = Array.isArray(homeC) ? homeC : [homeC];
-    const aArr = Array.isArray(awayC) ? awayC : [awayC];
-    setSelectedColor('homePrimaryColor', hArr[0] || 'blue');
-    setSelectedColor('homeSecondaryColor', hArr[1] || '');
-    setSelectedColor('awayPrimaryColor', aArr[0] || 'white');
-    setSelectedColor('awaySecondaryColor', aArr[1] || '');
+    setShade('homeShade', cfg.teams_colors_info?.Home || ['black']);
+    setShade('awayShade', cfg.teams_colors_info?.Away || ['white']);
     document.getElementById('homeGoalies').value = (cfg.goalies_home || []).join(', ');
     document.getElementById('awayGoalies').value = (cfg.goalies_away || []).join(', ');
 
@@ -565,9 +599,9 @@ function showToast(msg, type) {
 // ========== Init ==========
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Init color swatches with defaults
-    initColorSwatches('homePrimaryColor', 'homeSecondaryColor', 'blue', '');
-    initColorSwatches('awayPrimaryColor', 'awaySecondaryColor', 'white', '');
+    // Default: Home dark, Away light (the common broadcast case)
+    initShadeToggle('homeShade', 'dark');
+    initShadeToggle('awayShade', 'light');
     loadConfigList();
     // Start with one empty pair and line per side
     addPair('home'); addLine('home');
@@ -577,6 +611,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('input', (e) => {
         if (e.target.closest('.cfg-team-card')) updateSummary();
     });
+    // Re-render dynamic labels on language change
+    if (window.PSF_I18N) {
+        PSF_I18N.onChange(() => {
+            // Re-render pair/line labels
+            renumber('home'); renumber('away');
+            // Re-render player-name placeholders
+            document.querySelectorAll('.form-input-name').forEach(inp => {
+                inp.placeholder = PSF_I18N.t('cfg_player_name_ph');
+            });
+            updateSaveButton();
+            updateSummary();
+            loadConfigList();
+        });
+    }
 });
 </script>
 {% endblock %}

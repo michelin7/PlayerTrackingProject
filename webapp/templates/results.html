@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Результаты{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 data-i18n="res_list_title">Результаты</h1>
+    <p class="page-desc" data-i18n="res_list_desc">Готовые разборы: видео по игрокам и смены</p>
+</div>
+
+<div id="resultsList"></div>
+<div id="emptyState" style="display:none" class="card" style="text-align:center;padding:3rem">
+    <p style="color:var(--text-muted)">
+        <span data-i18n="res_list_empty">Пока нет готовых результатов.</span>
+        <a href="/upload" data-i18n="rl_empty_link">Загрузите видео</a>
+    </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let __jobs = null;
+
+function render(jobs) {
+    const done = jobs.filter(j => j.status === 'completed');
+    const container = document.getElementById('resultsList');
+    document.getElementById('emptyState').style.display = done.length ? 'none' : '';
+    const lang = PSF_I18N.getLang();
+    const localeTag = lang === 'ru' ? 'ru-RU' : 'en-US';
+    container.innerHTML = done.map(job => {
+        const date = new Date(job.created * 1000).toLocaleString(localeTag);
+        let details = '';
+        if (job.video_count != null) details += `<span>${PSF_I18N.t('rl_videos')}: ${job.video_count}</span>`;
+        if (job.accuracy) details += `<span>${PSF_I18N.t('rl_accuracy')}: <strong>${job.accuracy.accuracy_pct}%</strong></span>`;
+        return `<div class="card result-card" id="row-${job.job_id}">
+            <div class="result-card-header">
+                <div><span class="result-job-id">${job.job_id}</span></div>
+                <span class="result-date">${date}</span>
+            </div>
+            <div class="result-card-details">${details}</div>
+            <div class="result-card-actions">
+                <a href="/result/${job.job_id}" class="btn btn-primary btn-sm">${PSF_I18N.t('res_btn_open')}</a>
+                ${job.has_excel ? `<a href="/results/${job.excel_path}" class="btn btn-sm" download>${PSF_I18N.t('rl_btn_excel')}</a>` : ''}
+                <button class="btn btn-sm btn-danger-outline" onclick="deleteJob('${job.job_id}', this)">${PSF_I18N.t('rl_btn_delete')}</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// Inline confirm — native confirm() is suppressed in the desktop webview.
+function deleteJob(jobId, btn) {
+    const actions = btn.parentElement;
+    btn.style.display = 'none';
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap';
+    const msg = document.createElement('span');
+    msg.style.cssText = 'color:var(--text-muted);font-size:.82rem';
+    msg.textContent = PSF_I18N.t('rl_confirm_delete_short');
+    const yes = document.createElement('button');
+    yes.className = 'btn btn-sm btn-danger-outline';
+    yes.textContent = PSF_I18N.t('rl_btn_delete_yes');
+    const no = document.createElement('button');
+    no.className = 'btn btn-sm';
+    no.textContent = PSF_I18N.t('rl_btn_cancel');
+    wrap.append(msg, yes, no);
+    actions.appendChild(wrap);
+    no.onclick = () => { wrap.remove(); btn.style.display = ''; };
+    yes.onclick = async () => {
+        yes.disabled = true; no.disabled = true;
+        try {
+            const r = await fetch(`/api/job/${jobId}`, {method: 'DELETE'});
+            if (!r.ok) throw new Error('http ' + r.status);
+            __jobs = __jobs.filter(j => j.job_id !== jobId);
+            document.getElementById(`row-${jobId}`)?.remove();
+            render(__jobs);
+        } catch (e) {
+            msg.textContent = PSF_I18N.t('rl_delete_err');
+            yes.disabled = false; no.disabled = false;
+        }
+    };
+}
+
+async function load() { __jobs = await (await fetch('/api/results-list')).json(); render(__jobs); }
+if (window.PSF_I18N) PSF_I18N.onChange(() => { if (__jobs) render(__jobs); });
+load();
+</script>
+{% endblock %}

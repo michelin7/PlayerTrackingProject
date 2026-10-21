@@ -3,65 +3,65 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Статистика игроков</h1>
-    <p class="page-desc">Агрегированные данные по всем обработанным матчам</p>
+    <h1 data-i18n="st_title">Статистика игроков</h1>
+    <p class="page-desc" data-i18n="st_desc">Агрегированные данные по всем обработанным матчам</p>
 </div>
 
 <div class="stats-controls">
     <div class="filter-group">
-        <label>Датасет:</label>
+        <label data-i18n="st_filter_dataset">Датасет:</label>
         <select id="datasetFilter" class="form-select">
-            <option value="all">Все датасеты</option>
+            <option value="all" data-i18n="st_all_datasets">Все датасеты</option>
             {% for name in datasets.keys() %}
             <option value="{{ name }}">{{ name }}</option>
             {% endfor %}
         </select>
     </div>
     <div class="filter-group">
-        <label>Команда:</label>
+        <label data-i18n="st_filter_team">Команда:</label>
         <select id="teamFilter" class="form-select">
-            <option value="all">Все</option>
+            <option value="all" data-i18n="st_all_teams">Все</option>
             <option value="Home">Home</option>
             <option value="Away">Away</option>
         </select>
     </div>
     <div class="filter-group">
-        <label>Поиск:</label>
-        <input type="text" id="nameSearch" class="form-input" placeholder="Имя игрока...">
+        <label data-i18n="st_filter_search">Поиск:</label>
+        <input type="text" id="nameSearch" class="form-input" placeholder="Имя игрока..." data-i18n-placeholder="st_search_ph">
     </div>
     <div class="filter-group">
-        <label>Сортировка:</label>
+        <label data-i18n="st_filter_sort">Сортировка:</label>
         <select id="sortBy" class="form-select">
-            <option value="time">По времени на льду</option>
-            <option value="distance">По дистанции</option>
-            <option value="name">По имени</option>
+            <option value="time" data-i18n="st_sort_time">По времени на льду</option>
+            <option value="distance" data-i18n="st_sort_dist">По дистанции</option>
+            <option value="name" data-i18n="st_sort_name">По имени</option>
         </select>
     </div>
 </div>
 
 <div class="stats-charts-row">
     <div class="card">
-        <h3 class="card-title">Время на льду (топ-15)</h3>
+        <h3 class="card-title" data-i18n="st_time_top">Время на льду (топ-15)</h3>
         <canvas id="timeBarChart" height="300"></canvas>
     </div>
     <div class="card">
-        <h3 class="card-title">Дистанция vs Время</h3>
+        <h3 class="card-title" data-i18n="st_dist_vs_time">Дистанция vs Время</h3>
         <canvas id="scatterChart" height="300"></canvas>
     </div>
 </div>
 
 <div class="card card-wide">
-    <h3 class="card-title">Таблица игроков <span id="playerCount" class="badge"></span></h3>
+    <h3 class="card-title"><span data-i18n="st_table_title">Таблица игроков</span> <span id="playerCount" class="badge"></span></h3>
     <div class="table-wrapper">
         <table class="data-table" id="statsTable">
             <thead>
                 <tr>
-                    <th class="sortable" data-sort="name">Имя</th>
-                    <th>Номер</th>
-                    <th>Команда</th>
-                    <th class="sortable" data-sort="time">Время (с)</th>
-                    <th class="sortable" data-sort="distance">Дистанция (м)</th>
-                    <th>Скорость (м/с)</th>
+                    <th class="sortable" data-sort="name" data-i18n="st_col_name">Имя</th>
+                    <th data-i18n="st_col_number">Номер</th>
+                    <th data-i18n="st_col_team">Команда</th>
+                    <th class="sortable" data-sort="time" data-i18n="st_col_time">Время (с)</th>
+                    <th class="sortable" data-sort="distance" data-i18n="st_col_dist">Дистанция (м)</th>
+                    <th data-i18n="st_col_speed">Скорость (м/с)</th>
                 </tr>
             </thead>
             <tbody id="statsBody"></tbody>
@@ -71,11 +71,11 @@
 
 <div class="stats-charts-row">
     <div class="card">
-        <h3 class="card-title">Распределение времени на льду</h3>
+        <h3 class="card-title" data-i18n="st_time_hist">Распределение времени на льду</h3>
         <canvas id="timeHistChart" height="250"></canvas>
     </div>
     <div class="card">
-        <h3 class="card-title">Средняя скорость по командам</h3>
+        <h3 class="card-title" data-i18n="st_speed_team">Средняя скорость по командам</h3>
         <canvas id="speedTeamChart" height="250"></canvas>
     </div>
 </div>
@@ -111,14 +111,14 @@ function getFiltered() {
 }
 
 function teamColor(team) {
-    if (team === 'Home') return '#3b82f6';
-    if (team === 'Away') return '#ef4444';
-    return '#6b7280';
+    if (team === 'Home') return '#4A90D9';
+    if (team === 'Away') return '#FF6300';
+    return '#9AA4AD';
 }
 
 function teamColorAlpha(team, a) {
-    if (team === 'Home') return `rgba(59,130,246,${a})`;
-    if (team === 'Away') return `rgba(239,68,68,${a})`;
+    if (team === 'Home') return `rgba(74,144,217,${a})`;
+    if (team === 'Away') return `rgba(255,99,0,${a})`;
     return `rgba(107,114,128,${a})`;
 }
 
@@ -142,7 +142,7 @@ function render() {
         `;
         tbody.appendChild(tr);
     }
-    document.getElementById('playerCount').textContent = data.length + ' игроков';
+    document.getElementById('playerCount').textContent = data.length + ' ' + PSF_I18N.t('st_players_count');
 
     // Time bar chart (top 15)
     const top15 = data.slice(0, 15);
@@ -151,7 +151,7 @@ function render() {
         data: {
             labels: top15.map(p => p.Name || 'N/A'),
             datasets: [{
-                label: 'Время (с)',
+                label: PSF_I18N.t('st_time_s'),
                 data: top15.map(p => p['Time (s)']),
                 backgroundColor: top15.map(p => teamColor(p.Team)),
             }]
@@ -159,7 +159,7 @@ function render() {
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: { y: { title: { display: true, text: 'Секунды' } } }
+            scales: { y: { title: { display: true, text: PSF_I18N.t('st_seconds') } } }
         }
     }));
 
@@ -175,13 +175,13 @@ function render() {
                 {
                     label: 'Home',
                     data: scatterData.filter(d => d.team === 'Home').map(d => ({ x: d.x, y: d.y })),
-                    backgroundColor: 'rgba(59,130,246,0.7)',
+                    backgroundColor: 'rgba(74,144,217,0.8)',
                     pointRadius: 6,
                 },
                 {
                     label: 'Away',
                     data: scatterData.filter(d => d.team === 'Away').map(d => ({ x: d.x, y: d.y })),
-                    backgroundColor: 'rgba(239,68,68,0.7)',
+                    backgroundColor: 'rgba(255,99,0,0.8)',
                     pointRadius: 6,
                 }
             ]
@@ -190,8 +190,8 @@ function render() {
             responsive: true,
             plugins: { legend: { position: 'bottom' } },
             scales: {
-                x: { title: { display: true, text: 'Время (с)' } },
-                y: { title: { display: true, text: 'Дистанция (м)' } }
+                x: { title: { display: true, text: PSF_I18N.t('st_time_s') } },
+                y: { title: { display: true, text: PSF_I18N.t('st_distance_m') } }
             }
         }
     }));
@@ -210,14 +210,14 @@ function render() {
         type: 'bar',
         data: {
             labels: binLabels,
-            datasets: [{ label: 'Кол-во игроков', data: binCounts, backgroundColor: '#8b5cf6' }]
+            datasets: [{ label: PSF_I18N.t('st_players_count_chart'), data: binCounts, backgroundColor: '#FF6300' }]
         },
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
             scales: {
-                x: { title: { display: true, text: 'Время на льду (с)' } },
-                y: { title: { display: true, text: 'Игроков' } }
+                x: { title: { display: true, text: PSF_I18N.t('st_time_on_ice_s') } },
+                y: { title: { display: true, text: PSF_I18N.t('st_players') } }
             }
         }
     }));
@@ -239,7 +239,7 @@ function render() {
         type: 'bar',
         data: {
             labels: teamLabels,
-            datasets: [{ label: 'Средняя скорость (м/с)', data: avgSpeeds, backgroundColor: teamLabels.map(t => teamColor(t)) }]
+            datasets: [{ label: PSF_I18N.t('st_avg_speed_ms'), data: avgSpeeds, backgroundColor: teamLabels.map(t => teamColor(t)) }]
         },
         options: {
             responsive: true,
@@ -254,6 +254,10 @@ function render() {
     document.getElementById(id).addEventListener('change', render);
 });
 document.getElementById('nameSearch').addEventListener('input', render);
+
+if (window.PSF_I18N) {
+    PSF_I18N.onChange(render);
+}
 
 render();
 </script>

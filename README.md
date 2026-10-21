@@ -78,7 +78,48 @@ Configuration → Detection & Tracking → Identification → Review → Results
 └── README.md
 ```
 
-## Setup
+## Install (end users)
+
+Download the installer for your system from the **Releases** page, then follow the
+steps below. The app is not signed with a paid developer certificate, so each
+system asks for one confirmation the first time — once per computer, never again.
+
+### macOS (Apple Silicon)
+
+1. Open `PSF-macOS.dmg` and drag **Player Scouting & Fitness** into **Applications**.
+2. Open **Applications** and double-click the app. macOS says it cannot verify the
+   developer — click **Done**.
+3. Open **System Settings → Privacy & Security**, scroll to the bottom and click
+   **Open Anyway**, then **Open**.
+
+From then on the app starts with a normal double-click.
+
+### Windows 10 / 11
+
+1. Run `PSF-Setup.exe`. Windows SmartScreen may warn about an unknown publisher —
+   click **More info → Run anyway**.
+2. Click through the installer. No administrator password is needed: the app
+   installs for the current user only.
+3. Start **Player Scouting & Fitness** from the Start menu or the desktop shortcut.
+
+The installer adds the Microsoft WebView2 runtime if it is missing, which the app
+uses to draw its window.
+
+### No warnings at all
+
+The warnings above come from the quarantine flag that browsers attach to
+downloads. Copying the installer from a USB stick or over a local network skips
+them entirely — useful when handing the app to a club.
+
+### Where your data lives
+
+Videos, results, and team configurations are stored outside the app, so updating
+or reinstalling it never touches them:
+
+- macOS — `~/Library/Application Support/PSF`
+- Windows — `%LOCALAPPDATA%\PSF`
+
+## Setup (from source)
 
 ### Prerequisites
 

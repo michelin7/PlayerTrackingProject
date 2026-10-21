@@ -8,38 +8,38 @@
         <p class="hero-subtitle" data-i18n="hero_subtitle">Полуавтоматическая система видеоаналитики хоккейных матчей: индивидуальный скаутинг игроков и оценка физических кондиций без дорогостоящих датчиков</p>
         <div class="hero-features">
             <div class="feature-card">
-                <div class="feature-icon">&#x1F3A5;</div>
+                <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="1"/></svg>
                 <h3 data-i18n="feat_scouting_title">Скаутинг по видео</h3>
                 <p data-i18n="feat_scouting_desc">Автоматическая нарезка видео по каждому игроку для индивидуального анализа действий на льду</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#x1F3C3;</div>
-                <h3 data-i18n="feat_fitness_title">Физические кондиции</h3>
-                <p data-i18n="feat_fitness_desc">Пройденная дистанция, средняя и максимальная скорость (км/ч) — данные, ранее доступные только с GPS/LPS-датчиками</p>
+                <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <h3 data-i18n="feat_fitness_title">Игровое время и смены</h3>
+                <p data-i18n="feat_fitness_desc">On-ice shifts: таймлайн смен каждого игрока и суммарное игровое время (TOI) без GPS/LPS-датчиков</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#x1F4B0;</div>
+                <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                 <h3 data-i18n="feat_nosensor_title">Без датчиков</h3>
                 <p data-i18n="feat_nosensor_desc">Достаточно трансляционного видео — не нужны дорогостоящие системы оптического или инерциального трекинга</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#x1F3AF;</div>
+                <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                 <h3 data-i18n="feat_detection_title">Детекция и трекинг</h3>
                 <p data-i18n="feat_detection_desc">YOLO-модель с ускорением на Apple Neural Engine + ByteTrack для непрерывного отслеживания игроков</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#x1F524;</div>
+                <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
                 <h3 data-i18n="feat_ident_title">Идентификация</h3>
                 <p data-i18n="feat_ident_desc">Классификация команд по цветам формы и распознавание номеров с учётом контекста звеньев</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#x2705;</div>
+                <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 <h3 data-i18n="feat_review_title">Ревизия результатов</h3>
                 <p data-i18n="feat_review_desc">Полуавтоматический режим: система размечает, человек проверяет и корректирует</p>
             </div>
         </div>
         <div class="hero-actions">
-            <a href="{{ url_for('upload') }}" class="btn btn-primary" data-i18n="btn_upload">Загрузить видео</a>
+            <a href="{{ url_for('analysis_page') }}" class="btn btn-primary" data-i18n="nav_analysis">Анализ видео</a>
             <a href="{{ url_for('config_page') }}" class="btn btn-secondary" data-i18n="btn_configs">Конфигурации</a>
         </div>
     </div>
@@ -124,7 +124,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nameText = keys.name ? t(keys.name) : key;
         const descText = keys.desc ? t(keys.desc) : '';
         card.innerHTML = `
-            <div class="model-status-icon">${info.exists ? '&#x2705;' : '&#x274C;'}</div>
+            <div class="model-status-icon">${info.exists
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'}</div>
             <h4 ${nameAttr}>${nameText}</h4>
             <p ${descAttr}>${descText}</p>
             ${info.size_mb ? `<span class="model-size">${info.size_mb} MB</span>` : ''}

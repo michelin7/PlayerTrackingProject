@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+{% block title %}Review{% endblock %}
+
+{% block content %}
+<style>
+#rvEditor, #seEditor { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; margin:.5rem 0 .7rem;
+            padding:.55rem .6rem; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); }
+.trk-chip.dropped { opacity:.4; text-decoration:line-through; border-style:dotted; }
+.rv-bar { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
+.tl-edit { margin-left:.4rem; color:var(--text-muted); cursor:pointer; font-size:.78rem; }
+.tl-edit:hover { color:var(--primary); }
+</style>
+
+<div class="page-header">
+    <h1 data-i18n="rvl_title">Ревизия записи</h1>
+    <p class="page-desc" data-i18n="rvl_desc">Та же картина, что и в живом контроле, только мнение системы уже окончательное: у каждого трека стоит игрок, которому он засчитан. Клик по игроку в сменах — видео встаёт на этот момент; чип справа правит трек.</p>
+</div>
+
+<div class="live-layout">
+  <div class="live-main">
+    <div class="card" style="padding:0;overflow:hidden;position:relative">
+        <video id="vid" style="width:100%;display:block;background:#000" controls preload="metadata"></video>
+        <canvas id="ov" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
+    </div>
+    <div class="card rv-bar">
+        <div style="display:flex;gap:.4rem;align-items:center">
+            <button id="btnStart" class="btn btn-sm" data-i18n="rvl_from_start">С начала</button>
+            <button id="btnHere" class="btn btn-sm" data-i18n="rvl_from_here">Отсюда</button>
+        </div>
+        <div style="color:var(--text-muted);font-variant-numeric:tabular-nums"><span id="tnow">0:00</span> / <span id="tdur">0:00</span></div>
+        <div style="color:var(--text-muted)"><span data-i18n="rvl_players">игроков</span>: <span id="nplayers">0</span></div>
+        <div style="color:var(--text-muted)"><span data-i18n="rvl_dropped">не засчитано треков</span>: <span id="ndropped">0</span></div>
+        <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center">
+            <span id="rvMsg" style="color:var(--text-muted);font-size:.85rem"></span>
+            <button id="btnSave" class="btn btn-sm" data-i18n="rvl_save">Сохранить</button>
+            <button id="btnDone" class="btn btn-primary btn-sm" data-i18n="rvl_done">Готово</button>
+        </div>
+    </div>
+    <div class="card" id="tlcard">
+        <div class="side-title" data-i18n="live_shifts_title">Смены на площадке</div>
+        <div class="side-muted" style="margin:-.4rem 0 .6rem;font-size:.75rem" data-i18n="rvl_shifts_hint">Клик по игроку — перейти к его первой смене; клик по полосе — к этому месту.</div>
+        <div id="seEditor" style="display:none">
+            <span id="seLabel" class="fixlabel" style="min-width:auto"></span>
+            <select id="seNum" class="form-input" style="width:170px"></select>
+            <select id="seTeam" class="form-input" style="width:96px"><option value="Home">Home</option><option value="Away">Away</option></select>
+            <button id="seSave" class="btn btn-primary btn-sm" data-i18n="live_save">Сохранить</button>
+            <button id="seRemove" class="btn btn-sm" data-i18n="live_remove_player">Убрать игрока</button>
+            <button id="seCancel" class="btn btn-sm" data-i18n="live_cancel">Отмена</button>
+        </div>
+        <div class="tl-row tl-head">
+            <span></span><span data-i18n="live_col_toi">Вр</span><span data-i18n="live_col_shifts">См</span><span></span>
+        </div>
+        <div id="tlrows"></div>
+        <div id="tlempty" class="side-muted" data-i18n="live_shifts_empty">Пока никто не идентифицирован по номеру.</div>
+    </div>
+  </div>
+
+  <aside class="live-side">
+    <div class="card" id="trkcard">
+        <div class="side-title"><span data-i18n="rvl_at_moment">Треки в этот момент</span> <span id="trkcount" class="side-count"></span></div>
+        <div class="side-muted" style="margin:-.4rem 0 .6rem;font-size:.75rem" data-i18n="rvl_at_hint">Каждый трек подписан игроком, которому он засчитан. Клик — сменить игрока или не засчитывать трек вовсе.</div>
+        <div id="rvEditor" style="display:none">
+            <span id="rvLabel" class="fixlabel" style="min-width:auto"></span>
+            <select id="rvNum" class="form-input" style="width:170px"></select>
+            <select id="rvTeam" class="form-input" style="width:96px"><option value="Home">Home</option><option value="Away">Away</option></select>
+            <button id="rvSave" class="btn btn-primary btn-sm" data-i18n="live_save">Сохранить</button>
+            <button id="rvCut" class="btn btn-sm" data-i18n="live_track_cut" data-i18n-title="live_cut_hint">Разрезать здесь</button>
+            <button id="rvDrop" class="btn btn-sm" data-i18n="rvl_drop">Не засчитывать</button>
+            <button id="rvKeep" class="btn btn-sm" style="display:none" data-i18n="rvl_keep">Вернуть</button>
+            <button id="rvClear" class="btn btn-sm" data-i18n="live_track_clear">Сбросить правку</button>
+            <button id="rvCancel" class="btn btn-sm" data-i18n="live_cancel">Отмена</button>
+            <span id="rvEdMsg" style="color:#e05252;font-size:.8rem"></span>
+        </div>
+        <div id="trklist" class="trk-grid"></div>
+        <div id="trkempty" class="side-muted" data-i18n="rvl_nobody">В этот момент треков нет.</div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const JOB = "{{ job_id }}";
+const $ = id => document.getElementById(id);
+const T = (k, v) => (window.PSF_I18N ? window.PSF_I18N.t(k, v) : k);
+const teamColor = t => t === 'Away' ? '#FF6300' : '#29B6D8';   // live's palette
+const fmt = s => { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+let M = null;            // review manifest
+let OV = null;           // per-frame track boxes, as recorded during the run
+let D = {};              // clip key -> decision, flat
+let CLIPS = [];          // every clip PART with its group, rebuilt after every cut
+let SHIFTS = [];
+let SPLITS = {};         // track id -> cut offsets inside its clip file
+let SPLIT_FILES = {};    // track id -> the files those cuts were written to
+let SPLIT_TIMES = {};    // track id -> the same cuts as match time (seconds of video)
+const TIMES = new Map(); // track id -> video seconds of every frame it was seen on
+
+// The decisions file is nested per group (that is what finalize reads); the page
+// works with one flat map and re-nests on save.
+function flatten(saved) {
+    const out = {};
+    for (const g of Object.values((saved || {}).decisions || {}))
+        for (const [k, d] of Object.entries(g.clips || {})) out[k] = d;
+    for (const [k, d] of Object.entries((saved || {}).unidentified_decisions || {})) out[k] = d;
+    SPLITS = Object.assign({}, (saved || {}).splits);
+    SPLIT_FILES = Object.assign({}, (saved || {}).split_files);
+    SPLIT_TIMES = Object.assign({}, (saved || {}).split_times);
+    return out;
+}
+function nest() {
+    const decisions = {}, unid = {};
+    for (const c of CLIPS) {
+        const d = D[c.key];
+        if (!d) continue;
+        if (c.unidentified) unid[c.key] = d;
+        else (decisions[c.cpid] = decisions[c.cpid] || {clips: {}}).clips[c.key] = d;
+    }
+    return {decisions, unidentified_decisions: unid, splits: SPLITS,
+            split_files: SPLIT_FILES, split_times: SPLIT_TIMES};
+}
+
+// Who a clip counts as right now: the decision if there is one, else what the
+// session concluded. A dropped clip counts as nobody.
+function assigned(c) {
+    const d = D[c.key];
+    if (d && (d.action === 'reject' || d.action === 'ignore')) return null;
+    if (d && (d.action === 'reassign' || d.action === 'assign'))
+        return {team: d.target_team, number: d.target_number, name: d.target_name};
+    if (c.unidentified) return null;
+    return {team: c.gteam, number: c.gnumber, name: c.gname};
+}
+
+function ivOf(c) {
+    return (c.iv && c.iv.length) ? c.iv : [[c.first_seen, c.first_seen + c.toi]];
+}
+
+// ---- cuts ------------------------------------------------------------------
+// A clip file holds exactly the frames on which its track was seen, so a second
+// inside the file is NOT a second of the match. The overlay recorded those very
+// frames, which is what converts one into the other.
+function trackTimes(tid) {
+    if (TIMES.has(tid)) return TIMES.get(tid);
+    const out = [];
+    for (const [t, boxes] of ((OV && OV.frames) || []))
+        if (boxes.some(b => String(b[0]) === tid)) out.push(t);
+    TIMES.set(tid, out);
+    return out;
+}
+function videoTimeOf(tid, off) {         // clip-file seconds -> video seconds
+    const ts = trackTimes(tid);
+    if (!ts.length) return null;
+    return ts[Math.min(Math.round(off * (M.fps || 25)), ts.length - 1)];
+}
+function offsetOf(tid, t) {              // video seconds -> clip-file seconds
+    const ts = trackTimes(tid);
+    let n = 0;
+    while (n < ts.length && ts[n] < t) n++;
+    return Math.round(n / (M.fps || 25) * 100) / 100;
+}
+
+// One clip, split into the parts the reviewer cut it into — the same parts
+// finalize will build from the same offsets, under the same keys.
+function partsOf(c) {
+    const tid = String(c.track_id);
+    const whole = Object.assign({}, c, {key: tid, tid: tid, part: 0});
+    const cuts = (SPLITS[tid] || []).filter(x => x > 0 && x < c.toi).sort((a, b) => a - b);
+    if (!cuts.length) return [whole];
+    const stored = SPLIT_TIMES[tid] || [];
+    const marks = stored.length === cuts.length ? stored.slice().sort((a, b) => a - b)
+                                                : cuts.map(off => videoTimeOf(tid, off));
+    if (marks.some(x => x == null)) return [whole];    // no overlay: cannot place a cut
+    const edges = [-Infinity, ...marks, Infinity];
+    return edges.slice(0, -1).map((lo, i) => {
+        const hi = edges[i + 1];
+        const iv = ivOf(c).map(([a, b]) => [Math.max(a, lo), Math.min(b, hi)])
+                          .filter(([a, b]) => b > a);
+        const toi = iv.reduce((s, [a, b]) => s + (b - a), 0);
+        return Object.assign({}, c, {
+            key: `${tid}#${i}`, tid: tid, part: i, iv: iv,
+            first_seen: iv.length ? Math.round(iv[0][0] * 10) / 10 : c.first_seen,
+            toi: Math.round(toi * 10) / 10});
+    });
+}
+
+function buildClips() {
+    const src = [];
+    for (const g of M.groups || [])
+        for (const c of g.clips || [])
+            src.push(Object.assign({}, c, {cpid: g.canonical_pid, unidentified: false,
+                gteam: g.auto_team, gnumber: g.auto_number, gname: g.auto_name}));
+    for (const g of M.unidentified || [])
+        for (const c of g.clips || [])
+            src.push(Object.assign({}, c, {cpid: g.canonical_pid, unidentified: true,
+                gteam: c.auto_team, gnumber: c.auto_number, gname: c.auto_name}));
+    CLIPS = src.flatMap(partsOf);
+}
+
+async function load() {
+    M = await (await fetch(`/api/job/${JOB}/review`)).json();
+    D = flatten(M.saved_decisions);
+    // Where every track was, frame by frame. Written by both modes since this
+    // version; an older run simply has no overlay.
+    try {
+        const r = await fetch(`/results/${JOB}/overlay.json`);
+        if (r.ok) OV = await r.json();
+    } catch (e) { OV = null; }
+    buildClips();
+    const probe = await fetch(`/api/job/${JOB}/source`, {method: 'HEAD'});
+    if (probe.ok) $('vid').src = `/api/job/${JOB}/source`;
+    else {
+        $('vid').closest('.card').style.display = 'none';
+        $('rvMsg').textContent = T('rvl_no_video');
+    }
+    await refreshShifts();
+    renderTracks();
+}
+
+// The timeline is rebuilt by the SERVER from the current decisions, with the same
+// builder live uses — so what review shows and what the result holds cannot drift.
+async function refreshShifts() {
+    const r = await fetch(`/api/job/${JOB}/shifts`, {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({decisions: D, splits: SPLITS, split_times: SPLIT_TIMES})});
+    SHIFTS = (await r.json()).shifts || [];
+    renderShifts();
+    $('nplayers').textContent = SHIFTS.length;
+    $('ndropped').textContent = CLIPS.filter(c => !assigned(c)).length;
+}
+
+function renderShifts() {
+    const dur = $('vid').duration || M.duration || Math.max(...SHIFTS.flatMap(s =>
+        (s.intervals || []).map(i => i[1])), 1);
+    const tc = M.team_colors || {};
+    const row = s => {
+        const col = tc[s.team] || teamColor(s.team);
+        const pct = (a, b) => `left:${a / dur * 100}%;width:${Math.max((b - a) / dur * 100, 0.4)}%`;
+        const bridge = (s.bridged || []).map(([a, b]) =>
+            `<div class="tl-bar tl-bridge" style="${pct(a, b)};--c:${col}"></div>`).join('');
+        const bars = (s.intervals || []).map(([a, b]) =>
+            `<div class="tl-bar" style="${pct(a, b)};background:${col}" data-at="${a}"></div>`).join('');
+        const first = (s.intervals && s.intervals[0]) ? s.intervals[0][0] : 0;
+        return `<div class="tl-row">
+            <span class="tl-name" data-at="${first}" title="${T('rvl_seek')}"><span class="tl-dot" style="background:${col}"></span>#${s.number}${s.name ? ' ' + s.name : ''}<span
+                  class="tl-edit" data-team="${s.team}" data-number="${s.number}" title="${T('live_edit_player')}">&#9998;</span></span>
+            <span style="font-variant-numeric:tabular-nums">${fmt(s.toi)}</span>
+            <span style="color:var(--text-muted)">${s.shifts}</span>
+            <div class="tl-track" data-from="0" data-dur="${dur}">${bridge}${bars}<div class="tl-play" style="left:${Math.min(($('vid').currentTime || 0) / dur * 100, 100)}%"></div></div>
+        </div>`;
+    };
+    $('tlempty').style.display = SHIFTS.length ? 'none' : '';
+    $('tlrows').innerHTML = PSF_LINES.render(PSF_LINES.group(SHIFTS, M.lines), row,
+                                             t => tc[t] || teamColor(t));
+    $('tlrows').querySelectorAll('.tl-name').forEach(el =>
+        el.onclick = () => seek(+el.dataset.at));
+    // the pencil edits the player instead of jumping to him
+    $('tlrows').querySelectorAll('.tl-edit').forEach(el => el.onclick = ev => {
+        ev.stopPropagation();
+        openShiftEditor(el, el.dataset.team, el.dataset.number);
+    });
+    // clicking the strip itself goes to that point in the video
+    $('tlrows').querySelectorAll('.tl-track').forEach(el => el.onclick = ev => {
+        const r = el.getBoundingClientRect();
+        seek((ev.clientX - r.left) / r.width * (+el.dataset.dur));
+    });
+}
+
+// Clicking a shift is "show me this": jump there and keep playing, so the whole
+// video is watchable from any point, not only inspectable frame by frame.
+function seek(t, play = true) {
+    const v = $('vid');
+    v.currentTime = Math.max(t, 0);
+    if (play) v.play().catch(() => {});       // autoplay may be refused: not fatal
+    renderTracks();
+}
+$('btnStart').onclick = () => seek(0);
+$('btnHere').onclick = () => { const v = $('vid'); v.paused ? v.play().catch(() => {}) : v.pause(); };
+
+// Tracks whose life covers the moment on screen — the review answer to live's
+// "on the ice" panel.
+function atMoment(t) {
+    return CLIPS.filter(c => ivOf(c).some(([a, b]) => a - 0.2 <= t && t <= b + 0.2));
+}
+function partAt(tid, t) {
+    const same = CLIPS.filter(c => c.tid === String(tid));
+    return same.find(c => ivOf(c).some(([a, b]) => a - 0.2 <= t && t <= b + 0.2)) || same[0] || null;
+}
+function renderTracks() {
+    const t = $('vid').currentTime || 0;
+    const tc = M.team_colors || {}, here = atMoment(t);
+    $('trkcount').textContent = here.length ? '(' + here.length + ')' : '';
+    $('trkempty').style.display = here.length ? 'none' : '';
+    $('trklist').innerHTML = here.map(c => {
+        const a = assigned(c);
+        const col = a ? (tc[a.team] || teamColor(a.team)) : 'var(--text-muted)';
+        const label = a ? `#${a.number}${a.name ? ' ' + a.name : ''}` : T('rvl_not_counted');
+        const fixed = D[c.key] ? ' fixed' : '';
+        const cuts = SPLITS[c.tid] ? `<span class="trk-cuts" title="${T('live_cut_done')}">&#9986;</span>` : '';
+        return `<span class="trk-chip${a ? '' : ' dropped unknown'}${fixed}" data-key="${c.key}">
+            <span class="trk-dot" style="background:${col}"></span>${label}
+            <span class="trk-id">T${c.key}</span>${cuts}</span>`;
+    }).join('');
+    $('trklist').querySelectorAll('.trk-chip').forEach(el =>
+        el.onclick = () => openEditor(el.dataset.key));
+}
+
+// ---- the live-control picture, replayed -----------------------------------
+function frameAt(t) {
+    const F = OV && OV.frames;
+    if (!F || !F.length) return null;
+    let lo = 0, hi = F.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; F[m][0] <= t ? lo = m : hi = m - 1; }
+    const best = (lo + 1 < F.length && Math.abs(F[lo + 1][0] - t) < Math.abs(F[lo][0] - t))
+               ? F[lo + 1] : F[lo];
+    return Math.abs(best[0] - t) <= 0.5 ? best : null;   // a gap: draw nothing
+}
+
+function chip(g, x, y, w, h, r, color) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.fillStyle = color;
+    g.fill();
+}
+
+// The canvas is the SIZE OF THE RECORDED FRAME and CSS scales it down with the
+// video, so every number below is the number LiveSession._draw() passes to cv2:
+// same ellipse, same chip, same 13px-tall label, scaled by the same factor.
+const LBL_H = 13;                     // cv2 text height at FONT_HERSHEY_SIMPLEX 0.55
+const LBL_FACE = '400 21px Barlow';   // the app's own face, cv2's metrics within 3%
+const LBL_FONT = LBL_FACE + ', sans-serif';
+// Canvas text does not pull a webfont in by itself: ask for the face, or the
+// labels come out in a fallback and every chip is a fifth too narrow.
+document.fonts.load(LBL_FACE).catch(() => {});
+const NO_TEAM = '#969696';            // cv2 (150,150,150): a track with no team
+
+// What live prints over a player: the jersey identity, else the track handle.
+function trackLabel(tid, a) {
+    if (!a || a.number == null) return `Track ${tid}`;
+    const nm = (a.name && !['None', 'Unknown'].includes(a.name)) ? a.name : '';
+    return `#${a.number} ${nm}`.trim();
+}
+
+function drawOverlay() {
+    const v = $('vid'), cv = $('ov');
+    if (!OV) return;
+    if (cv.width !== OV.w) { cv.width = OV.w; cv.height = OV.h; }
+    const g = cv.getContext('2d');
+    g.clearRect(0, 0, OV.w, OV.h);
+    const rec = frameAt(v.currentTime);
+    if (!rec) return;
+    const tc = M.team_colors || {};
+    g.font = LBL_FONT;
+    g.textBaseline = 'alphabetic';
+    for (const [tid, x1, y1, x2, y2] of rec[1]) {
+        const c = partAt(tid, rec[0]);
+        const a = c ? assigned(c) : null;
+        // A track that counts for nobody stays on the picture, faded the way its
+        // chip is faded — review is where you take it back, so it has to be seen.
+        const dropped = c && !a;
+        const team = a ? a.team : (c ? c.gteam : null);
+        const color = dropped ? NO_TEAM
+                    : (tc[team] || (team && team !== 'Unknown' ? teamColor(team) : NO_TEAM));
+        const label = trackLabel(c ? c.key : tid, a);
+        g.globalAlpha = dropped ? 0.45 : 1;
+        const cx = (x1 + x2) / 2, bw = x2 - x1;
+        const ew = Math.max(bw * 0.5, 10), eh = Math.max(ew * 0.35, 4);
+        g.strokeStyle = color;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.ellipse(cx, y2, ew, eh, 0, 0, Math.PI * 2);
+        g.stroke();
+        const cw = g.measureText(label).width + 12, ch = LBL_H + 8;
+        const lx = Math.max(0, Math.min(cx - cw / 2, OV.w - cw)), ly = Math.max(y1 - ch - 6, 2);
+        chip(g, lx, ly, cw, ch, 6, color);
+        // black on light markers, white on dark — the rule the live overlay uses
+        const rgb = color.length === 7
+            ? [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)) : [40, 40, 40];
+        g.fillStyle = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) > 140 ? '#191919' : '#F5F5F5';
+        g.fillText(label, lx + 6, ly + ch - 5);
+        g.globalAlpha = 1;
+    }
+}
+
+// Follow playback frame by frame; a paused video still redraws after an edit.
+(function tick() { drawOverlay(); requestAnimationFrame(tick); })();
+window.addEventListener('resize', drawOverlay);
+
+// ---- one track (the chip panel) -------------------------------------------
+function curPart() { return CLIPS.find(c => c.key === $('rvEditor').dataset.key); }
+
+function openEditor(key) {
+    $('vid').pause();                  // hold the moment being judged
+    const c = CLIPS.find(x => x.key === key);
+    const a = assigned(c);
+    $('rvEdMsg').textContent = '';
+    $('rvLabel').textContent = 'T' + key + ' · ' + fmt(c.toi);
+    $('rvTeam').value = (a ? a.team : c.gteam) === 'Away' ? 'Away' : 'Home';
+    PSF_ROSTER.fill($('rvNum'), M.roster, $('rvTeam').value,
+                    a ? (a.number ?? '') : (c.gnumber ?? ''));
+    $('rvEditor').dataset.key = key;
+    $('rvDrop').style.display = a ? '' : 'none';
+    $('rvKeep').style.display = a ? 'none' : '';
+    $('rvClear').style.display = D[key] ? '' : 'none';
+    $('rvCut').style.display = OV ? '' : 'none';     // a cut needs the frame record
+    $('rvEditor').style.display = 'flex';
+}
+function decide(key, d) {
+    if (d) D[key] = d; else delete D[key];
+    $('rvEditor').style.display = 'none';
+    markDirty();
+    refreshShifts().then(renderTracks);
+}
+$('rvTeam').onchange = () => PSF_ROSTER.refill($('rvNum'), M.roster, $('rvTeam').value);
+$('rvSave').onclick = () => {
+    const c = curPart();
+    const num = $('rvNum').value, team = $('rvTeam').value;
+    if (!num) return;
+    const name = ((M.roster || {})[team] || {})[num] || '';
+    decide(c.key, {action: c.unidentified ? 'assign' : 'reassign',
+                   target_team: team, target_number: num, target_name: name});
+};
+$('rvDrop').onclick = () => {
+    const c = curPart();
+    decide(c.key, {action: c.unidentified ? 'ignore' : 'reject'});
+};
+$('rvKeep').onclick = () => {
+    const c = curPart();
+    if (c.unidentified && c.gnumber == null) { $('rvNum').focus(); return; }
+    decide(c.key, c.unidentified
+        ? {action: 'assign', target_team: c.gteam, target_number: c.gnumber, target_name: c.gname}
+        : null);
+};
+$('rvClear').onclick = () => decide(curPart().key, null);
+$('rvCancel').onclick = () => { $('rvEditor').style.display = 'none'; };
+
+// The tracker jumped onto another player mid-track: split it HERE, at the moment
+// on screen. Live does the same on the running frame; here the cut is written out
+// as real part files, and both parts are named separately afterwards.
+$('rvCut').onclick = async () => {
+    const c = curPart(), tid = c.tid, t = $('vid').currentTime;
+    const whole = CLIPS.filter(x => x.tid === tid).reduce((s, x) => s + (x.toi || 0), 0);
+    const off = offsetOf(tid, t);
+    const cuts = [...new Set([...(SPLITS[tid] || []), off])]
+        .filter(x => x > 0.5 && x < whole - 0.5).sort((a, b) => a - b);
+    if (!cuts.includes(off)) { $('rvEdMsg').textContent = T('live_cut_short'); return; }
+    const r = await fetch(`/api/job/${JOB}/cut`, {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({track_id: tid, cuts: cuts})});
+    if (!r.ok) { $('rvEdMsg').textContent = T('live_cut_short'); return; }
+    SPLITS[tid] = cuts;
+    SPLIT_FILES[tid] = ((await r.json()).files || []).map(f => f.file);
+    // The server counts a part's ice time in match seconds, not in file seconds —
+    // it needs to know where each cut falls in the video.
+    SPLIT_TIMES[tid] = cuts.map(off => videoTimeOf(tid, off));
+    // The parts are different players: whatever was decided about the whole track
+    // no longer applies to either of them.
+    for (const k of Object.keys(D))
+        if (k === tid || k.startsWith(tid + '#')) delete D[k];
+    buildClips();
+    $('rvEditor').style.display = 'none';
+    markDirty();
+    await refreshShifts();
+    renderTracks();
+};
+
+// ---- one player (the shift list) ------------------------------------------
+function playerParts(team, number) {
+    return CLIPS.filter(c => {
+        const a = assigned(c);
+        return a && a.team === team && String(a.number) === String(number);
+    });
+}
+function openShiftEditor(el, team, number) {
+    const ed = $('seEditor');
+    $('seLabel').textContent = '#' + number;
+    $('seTeam').value = team === 'Away' ? 'Away' : 'Home';
+    PSF_ROSTER.fill($('seNum'), M.roster, $('seTeam').value, number);
+    ed.dataset.team = team; ed.dataset.number = number;
+    // Open it right under the row that was clicked: with 20+ players an editor
+    // at the top of the card is off-screen and reads as "nothing happened".
+    const row = el.closest('.tl-row');
+    document.querySelectorAll('.tl-row.editing').forEach(r => r.classList.remove('editing'));
+    row.classList.add('editing');
+    row.after(ed);
+    ed.style.display = 'flex';
+}
+function closeShiftEditor() {
+    const ed = $('seEditor');
+    ed.style.display = 'none';
+    $('tlcard').prepend(ed);           // out of the rows, which get re-rendered
+    document.querySelectorAll('.tl-row.editing').forEach(r => r.classList.remove('editing'));
+}
+function applyToPlayer(team, number, make) {
+    for (const c of playerParts(team, number)) D[c.key] = make(c);
+    closeShiftEditor();
+    markDirty();
+    refreshShifts().then(renderTracks);
+}
+$('seTeam').onchange = () => PSF_ROSTER.refill($('seNum'), M.roster, $('seTeam').value);
+$('seSave').onclick = () => {
+    const ed = $('seEditor'), num = $('seNum').value, team = $('seTeam').value;
+    if (!num) return;
+    const name = ((M.roster || {})[team] || {})[num] || '';
+    applyToPlayer(ed.dataset.team, ed.dataset.number, c => ({
+        action: c.unidentified ? 'assign' : 'reassign',
+        target_team: team, target_number: num, target_name: name}));
+};
+$('seRemove').onclick = () => {
+    const ed = $('seEditor');
+    applyToPlayer(ed.dataset.team, ed.dataset.number,
+                  c => ({action: c.unidentified ? 'ignore' : 'reject'}));
+};
+$('seCancel').onclick = () => closeShiftEditor();
+
+let dirty = false;
+function markDirty() { dirty = true; $('rvMsg').textContent = T('rvl_unsaved'); }
+async function save() {
+    await fetch(`/api/job/${JOB}/review`, {method: 'POST',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify(nest())});
+    dirty = false; $('rvMsg').textContent = T('rvl_saved');
+}
+$('btnSave').onclick = save;
+// Finalizing renders a video per player — minutes of work. Jumping to the result
+// page right away only bounced back here, because the result did not exist yet:
+// follow the job and go when it is actually done.
+$('btnDone').onclick = async () => {
+    $('btnDone').disabled = true; $('rvMsg').textContent = T('rvl_finalizing');
+    await save();
+    const r = await fetch(`/api/job/${JOB}/finalize`, {method: 'POST'});
+    if (!r.ok) {
+        $('btnDone').disabled = false;
+        $('rvMsg').textContent = ((await r.json()) || {}).error || T('rvl_fin_failed');
+        return;
+    }
+    while (true) {
+        await new Promise(ok => setTimeout(ok, 1500));
+        let j;
+        try { j = await (await fetch(`/api/job/${JOB}`)).json(); } catch (e) { continue; }
+        if (j.error) break;                       // the run is gone from memory: let
+        if (j.status === 'error') {               // the result page have the last word
+            $('rvMsg').textContent = j.msg ? T(j.msg.k, j.msg.v) : j.message;
+            $('btnDone').disabled = false;
+            return;
+        }
+        if (j.msg) $('rvMsg').textContent = T(j.msg.k, j.msg.v);
+        else if (j.message) $('rvMsg').textContent = j.message;
+        if (j.status === 'completed') break;
+    }
+    window.location = '/result/' + JOB;
+};
+
+const vid = $('vid');
+vid.addEventListener('timeupdate', () => {
+    $('tnow').textContent = fmt(vid.currentTime);
+    renderTracks();
+    const dur = vid.duration || 1;
+    document.querySelectorAll('.tl-play').forEach(p =>
+        p.style.left = Math.min(vid.currentTime / dur * 100, 100) + '%');
+});
+vid.addEventListener('loadedmetadata', () => { $('tdur').textContent = fmt(vid.duration); renderShifts(); });
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+load();
+</script>
+{% endblock %}

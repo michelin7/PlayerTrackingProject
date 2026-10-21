@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Результат{% endblock %}
+
+{% block content %}
+<style>
+/* On-ice shifts timeline (shared look with Live control / review) */
+.rv-tl-row { display:grid; grid-template-columns:170px 54px 34px 1fr; align-items:center; gap:.5rem; height:24px; }
+.rv-tl-head { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); }
+.rv-tl-name { display:flex; align-items:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.82rem; }
+.rv-tl-dot { width:8px; height:8px; border-radius:50%; margin-right:.4rem; flex:0 0 auto; }
+.rv-tl-track { position:relative; height:14px; background:rgba(128,128,128,.12); border-radius:3px; overflow:hidden; }
+.rv-tl-bar { position:absolute; top:2px; height:10px; border-radius:2px; }
+.rv-tl-bridge { background:repeating-linear-gradient(45deg, var(--c) 0 2px, rgba(0,0,0,0) 2px 5px); opacity:.9; }
+/* player result cards */
+.res-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+.res-card { padding:0; overflow:hidden; }
+.res-card video { width:100%; display:block; background:#000; }
+.res-card-body { padding:.7rem .9rem; }
+.res-card-name { font-weight:600; margin:.1rem 0 .4rem; }
+.res-card-metrics { display:flex; flex-wrap:wrap; gap:.4rem 1rem; font-size:.8rem; color:var(--text-muted); font-variant-numeric:tabular-nums; }
+</style>
+<div class="page-header">
+    <h1 data-i18n="res_title">Результат</h1>
+    <p class="page-desc" data-i18n="res_desc">Видео по игрокам и время на льду</p>
+</div>
+
+<div class="review-summary card" id="accCard" style="display:none">
+    <div class="review-summary-items">
+        <div class="summary-item"><span class="summary-num" id="accPlayers">0</span><span class="summary-label" data-i18n="res_players">Игроков</span></div>
+        <div class="summary-item summary-approved"><span class="summary-num" id="accCorrect">0</span><span class="summary-label" data-i18n="rv_acc_correct">Верно</span></div>
+        <div class="summary-item summary-reassigned"><span class="summary-num" id="accCorrected">0</span><span class="summary-label" data-i18n="rv_acc_corrected">Исправлены</span></div>
+        <div class="summary-item"><span class="summary-num" id="accPct">—</span><span class="summary-label" data-i18n="rv_acc_pct">Точность</span></div>
+        <div class="summary-item" style="margin-left:auto;display:flex;gap:.5rem">
+            <a id="reviewLink" class="btn btn-sm" data-i18n="res_review">Ревизия</a>
+            <a id="excelLink" class="btn btn-sm" download data-i18n="res_excel">Excel</a>
+        </div>
+    </div>
+    <div id="accCalib" class="page-desc" style="display:none;font-size:.78rem;margin:.6rem 0 0;width:100%"
+         data-i18n-title="rv_cal_hint"></div>
+</div>
+
+<!-- On-ice shifts -->
+<details class="card" id="shiftsCard" style="display:none" open>
+    <summary style="cursor:pointer;font-weight:600" data-i18n="res_shifts_title">Смены на площадке</summary>
+    <div class="page-desc" style="margin:.4rem 0 .8rem;font-size:.78rem" data-i18n="rv_shifts_hint"></div>
+    <div class="rv-tl-row rv-tl-head">
+        <span data-i18n="res_players">Игрок</span>
+        <span data-i18n="rv_col_toi">Вр</span>
+        <span data-i18n="rv_col_shifts">См</span>
+        <span></span>
+    </div>
+    <div id="shiftRows"></div>
+</details>
+
+<div class="res-grid" id="playersGrid"></div>
+<div id="emptyState" class="card" style="display:none;text-align:center;padding:2rem;opacity:.6" data-i18n="res_empty">Нет финальных видео.</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const JOB_ID = "{{ job_id }}";
+const VID_URL = `/results/${JOB_ID}/player_videos_final/`;
+let data = null;
+
+function teamColor(team) { return team === 'Away' ? '#FF6300' : '#29B6D8'; }
+function fmtToi(s) { s = Math.round(s || 0); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+
+function renderShifts() {
+    const shifts = data.shifts || [];
+    const card = document.getElementById('shiftsCard');
+    if (!shifts.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    let dur = 1;
+    for (const s of shifts)
+        for (const seg of [...(s.intervals||[]), ...(s.bridged||[])]) dur = Math.max(dur, seg[1]);
+    const row = s => {
+        const col = teamColor(s.team);
+        const pct = (a,b) => `left:${a/dur*100}%;width:${Math.max((b-a)/dur*100,0.4)}%`;
+        const bridge = (s.bridged||[]).map(([a,b]) => `<div class="rv-tl-bar rv-tl-bridge" style="${pct(a,b)};--c:${col}"></div>`).join('');
+        const bars = (s.intervals||[]).map(([a,b]) => `<div class="rv-tl-bar" style="${pct(a,b)};background:${col}"></div>`).join('');
+        return `<div class="rv-tl-row">
+            <span class="rv-tl-name"><span class="rv-tl-dot" style="background:${col}"></span>#${s.number}${s.name?' '+s.name:''}</span>
+            <span style="font-variant-numeric:tabular-nums">${fmtToi(s.toi)}</span>
+            <span style="color:var(--text-muted)">${s.shifts}</span>
+            <div class="rv-tl-track">${bridge}${bars}</div>
+        </div>`;
+    };
+    document.getElementById('shiftRows').innerHTML = PSF_LINES.render(
+        PSF_LINES.group(shifts, data.lines), row, teamColor);
+}
+
+function renderPlayers() {
+    const players = data.players || [];
+    const grid = document.getElementById('playersGrid');
+    document.getElementById('emptyState').style.display = players.length ? 'none' : '';
+    grid.innerHTML = players.map(p => {
+        const teamClass = (p.team || '').toLowerCase();
+        const num = p.number != null ? p.number : '?';
+        const M = (k, v, u) => `<span>${PSF_I18N.t(k)}: ${v}${u||''}</span>`;
+        return `<div class="card res-card">
+            <video preload="none" controls src="${VID_URL}${encodeURIComponent(p.file)}"></video>
+            <div class="res-card-body">
+                <div class="res-card-name"><span class="team-badge team-${teamClass}">${p.team||'?'}</span> #${num} ${p.name||''}</div>
+                <div class="res-card-metrics">
+                    ${M('res_m_toi', fmtToi(p.toi))}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderAcc() {
+    const a = data.accuracy;
+    document.getElementById('accPlayers').textContent = (data.players || []).length;
+    document.getElementById('excelLink').href = `/results/${JOB_ID}/player_statistics.xlsx`;
+    document.getElementById('reviewLink').href = `/review/${JOB_ID}`;
+    if (a) {
+        document.getElementById('accCorrect').textContent = a.correct;
+        document.getElementById('accCorrected').textContent = a.corrected;
+        // A live session accepts nothing on the system's word, so the approve
+        // rate says nothing. What it can honestly report is how often the system
+        // read the same number the operator had already typed in.
+        const live = a.mode === 'live' && a.check && a.check.pct != null;
+        document.getElementById('accPct').textContent =
+            live ? a.check.pct + '%' : a.accuracy_pct + '%';
+        document.querySelector('#accPct + .summary-label').setAttribute(
+            'data-i18n', live ? 'res_check_pct' : 'rv_acc_pct');
+        if (window.PSF_I18N) PSF_I18N.applyLang(PSF_I18N.getLang());
+        // Was the confidence honest? Measured accuracy per band it claimed.
+        const cal = document.getElementById('accCalib');
+        cal.innerHTML = (a.calibration || []).map(c =>
+            `<span style="margin-right:1rem">${c.band} &rarr; <b>${c.correct_pct}%</b> `
+            + `${PSF_I18N.t('rv_cal_correct')} <span style="opacity:.6">(n=${c.n})</span></span>`).join('');
+        cal.style.display = (a.calibration || []).length ? '' : 'none';
+    }
+    document.getElementById('accCard').style.display = '';
+}
+
+function renderAll() { renderAcc(); renderShifts(); renderPlayers(); }
+
+async function init() {
+    try { data = await (await fetch(`/api/job/${JOB_ID}/result`)).json(); }
+    catch (e) { document.getElementById('emptyState').style.display = ''; return; }
+    renderAll();
+}
+if (window.PSF_I18N) PSF_I18N.onChange(() => { if (data) renderAll(); });
+init();
+</script>
+{% endblock %}
