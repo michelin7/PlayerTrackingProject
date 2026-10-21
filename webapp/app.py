@@ -31,7 +31,13 @@ def user_data_dir():
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "PlayerTracking"
     if sys.platform == "win32":
-        return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "PlayerTracking"
+        local = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "PlayerTracking"
+        # OpenCV on Windows cannot open a file whose path is not ASCII, and it
+        # fails quietly: a user called "Михаил" would get an empty results
+        # folder and no error. C:/Users/Public is ASCII whoever is logged in.
+        if str(local).isascii():
+            return local
+        return Path(os.environ.get("PUBLIC") or "C:/Users/Public") / "PlayerTracking"
     return Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share")) / "PlayerTracking"
 
 
