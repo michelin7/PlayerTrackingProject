@@ -19,7 +19,7 @@ excludes = ["tkinter", "PyQt5", "PyQt6", "PySide2", "PySide6", "IPython",
             "jupyter", "notebook", "tensorflow", "onnxruntime", "pytest",
             # dragged in from the dev environment, unused by the app
             "polars", "playwright", "numba", "llvmlite", "skimage",
-            "imageio", "imageio_ffmpeg", "statsmodels", "patsy", "sympy",
+            "imageio", "imageio_ffmpeg", "statsmodels", "patsy",
             "panel", "holoviews", "datashader",
             "onnx", "openvino", "tensorboard", "dask", "bokeh", "zmq"]
 
@@ -55,9 +55,8 @@ packages = ["torch", "torchvision"]
 if MAC_ARM:
     # ultralytics imports coremltools inside the loader, so an import scan never
     # sees the one package that can actually run the .mlpackage above. Without it
-    # the detector falls back to the 4x slower PyTorch weights. sympy rides along.
+    # the detector falls back to the 4x slower PyTorch weights.
     packages.append("coremltools")
-    excludes.remove("sympy")
 if sys.platform == "win32":
     packages.append("pythonnet")
     hiddenimports += ["clr"]

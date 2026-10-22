@@ -117,7 +117,7 @@ def selftest():
     # processes go too: a blocked urllib falls back to curl, and a missing
     # package makes ultralytics run `sys.executable -m pip install`, which in a
     # bundle re-launches the app. Both are refused rather than hidden.
-    connect, popen = socket.socket.connect, subprocess.Popen
+    connect, popen_init = socket.socket.connect, subprocess.Popen.__init__
 
     def loopback_only(self, address, *args, **kwargs):
         host = address[0] if isinstance(address, tuple) else ""
@@ -125,15 +125,17 @@ def selftest():
             raise OSError(f"selftest is offline on purpose, tried to reach {address}")
         return connect(self, address, *args, **kwargs)
 
-    def no_fetch(args, *rest, **kwargs):
-        # Only fetchers and installers are refused: coremltools shells out to
-        # sw_vers on every CoreML prediction, and that has to keep working.
+    # The constructor, not the class: asyncio.windows_utils subclasses Popen at
+    # import time, and a function cannot be a base class. Only fetchers and
+    # installers are refused - coremltools shells out to sw_vers on every CoreML
+    # prediction, and that has to keep working.
+    def no_fetch(self, args, *rest, **kwargs):
         line = " ".join(map(str, args)) if isinstance(args, (list, tuple)) else str(args)
         if any(w in line for w in ("http://", "https://", "curl", "wget", "pip")):
             raise OSError(f"selftest fetches nothing on purpose, tried to run {line}")
-        return popen(args, *rest, **kwargs)
+        return popen_init(self, args, *rest, **kwargs)
 
-    socket.socket.connect, subprocess.Popen = loopback_only, no_fetch
+    socket.socket.connect, subprocess.Popen.__init__ = loopback_only, no_fetch
 
     # Load the detector the way a job does. Shipping the .mlpackage without
     # coremltools passed every earlier check and then failed on the user's
