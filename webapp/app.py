@@ -65,6 +65,36 @@ if FROZEN:
     # all absolute; this is for the defaults of the code we don't own.
     os.chdir(DATA_DIR)
 
+    class _Tee:
+        """A packaged run has no console, so a failure on someone else's machine
+        leaves nothing to read. Keep a copy of the whole run next to the data."""
+
+        def __init__(self, *streams):
+            self._streams = [s for s in streams if s is not None]
+
+        def write(self, text):
+            for s in self._streams:
+                try:
+                    s.write(text)
+                except Exception:
+                    pass
+            return len(text)
+
+        def flush(self):
+            for s in self._streams:
+                try:
+                    s.flush()
+                except Exception:
+                    pass
+
+    try:
+        _log = open(DATA_DIR / "last_run.log", "w", buffering=1,
+                    encoding="utf-8", errors="replace")
+        sys.stdout = _Tee(sys.stdout, _log)
+        sys.stderr = _Tee(sys.stderr, _log)
+    except OSError:
+        pass
+
 # ---------------------------------------------------------------------------
 # Flask app
 # ---------------------------------------------------------------------------
@@ -3251,6 +3281,18 @@ def api_config_delete(config_id):
 @app.route("/results/<path:filename>")
 def serve_result(filename):
     return send_from_directory(str(RESULTS_FOLDER), filename)
+
+
+@app.route("/api/clientlog", methods=["POST"])
+def api_client_log():
+    """Page errors, into the run log.
+
+    Nobody can open a developer console in the desktop window, so a broken page
+    on another machine would otherwise leave no trace at all.
+    """
+    data = request.get_json(silent=True) or {}
+    print(f"[page {data.get('page', '?')}] {str(data.get('message'))[:1000]}", flush=True)
+    return "", 204
 
 
 @app.route("/api/models")

@@ -174,6 +174,11 @@ or reinstalling it never touches them:
 - macOS — `~/Library/Application Support/PlayerTracking`
 - Windows — `%LOCALAPPDATA%\PlayerTracking`
 
+That folder also holds `last_run.log`, a transcript of the most recent run
+(including page errors). The desktop window has no console, so if something goes
+wrong this file is what says what happened. If the window ever goes blank, **View
+→ Reload** brings the page back without stopping the run.
+
 ## Setup (from source)
 
 ### Prerequisites

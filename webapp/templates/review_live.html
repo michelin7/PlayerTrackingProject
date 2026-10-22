@@ -529,6 +529,15 @@ $('btnSave').onclick = save;
 // follow the job and go when it is actually done.
 $('btnDone').onclick = async () => {
     $('btnDone').disabled = true; $('rvMsg').textContent = T('rvl_finalizing');
+    // Finalizing re-encodes a video per player: minutes of CPU, while this page
+    // still holds the whole match decoded in the webview. Under memory pressure
+    // that is what gets killed, and the window goes black with the run looking
+    // dead. The video has nothing left to show here, so let it go first.
+    try {
+        vid.pause();
+        vid.removeAttribute('src');
+        vid.load();
+    } catch (e) { /* the progress line matters more than the player */ }
     await save();
     const r = await fetch(`/api/job/${JOB}/finalize`, {method: 'POST'});
     if (!r.ok) {

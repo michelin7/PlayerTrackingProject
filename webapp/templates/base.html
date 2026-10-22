@@ -6,11 +6,31 @@
     <!-- i18n.js rewrites this to "<heading> — Player Tracking" once the
          language is known; this is only the pre-script fallback. -->
     <title>{% block title %}Player Tracking{% endblock %}</title>
+    <script>
+    // Nobody can open a developer console in the desktop window, so a page
+    // error has to reach the run log or it leaves no trace at all.
+    (function () {
+        function report(message) {
+            try {
+                fetch('/api/clientlog', {method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: message, page: location.pathname})});
+            } catch (e) { /* nothing left to report with */ }
+        }
+        window.addEventListener('error', e =>
+            report((e.message || 'error') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || 0)));
+        window.addEventListener('unhandledrejection', e =>
+            report('unhandled rejection: ' +
+                   ((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
+    })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Fonts and Chart.js are served from the app, not a CDN: a stylesheet and
+         a script are both render-blocking, so on a machine with no network the
+         window stays blank until those requests time out. Refresh the files
+         with tools/fetch_assets.py. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <script>
     // Hudl chart theme: dark surfaces, single orange accent + grays, light
     // gridlines on dark, Barlow labels.

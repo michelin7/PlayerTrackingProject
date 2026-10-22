@@ -17,6 +17,7 @@ import traceback
 from pathlib import Path
 
 TITLE = "Player Tracking"
+HOME_URL = ""        # filled in once the server is up; the Reload menu needs it
 
 LOADING_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><style>
@@ -61,6 +62,7 @@ def busy(app_mod):
 
 
 def boot(window):
+    global HOME_URL
     try:
         import app as app_mod
         from werkzeug.serving import make_server
@@ -76,7 +78,8 @@ def boot(window):
                 TITLE, "Video processing is still running. Close the window and lose the result?")
 
         window.events.closing += closing
-        window.load_url(f"http://127.0.0.1:{port}/")
+        HOME_URL = f"http://127.0.0.1:{port}/"
+        window.load_url(HOME_URL)
     except Exception:
         native_error("Could not start the application.\n\n" + traceback.format_exc(limit=3))
         os._exit(1)
@@ -200,7 +203,21 @@ def main():
         return 1
     window = webview.create_window(TITLE, html=LOADING_HTML,
                                    width=1440, height=900, min_size=(1100, 700))
-    webview.start(boot, window)
+
+    def reload_page():
+        """Escape hatch from a blank window.
+
+        The web view runs the page in its own process and can lose it - a long
+        render under memory pressure is enough - leaving a black window and no
+        way back. This menu is native, so it still works when the page is gone.
+        """
+        try:
+            window.load_url(window.get_current_url() or HOME_URL)
+        except Exception:
+            window.load_url(HOME_URL)
+
+    menu = [webview.menu.Menu("View", [webview.menu.MenuAction("Reload", reload_page)])]
+    webview.start(boot, window, menu=menu)
     # Job threads are daemons and cv2 writers can hang on teardown; leaving the
     # process alive would keep a dead icon in the dock.
     os._exit(0)
