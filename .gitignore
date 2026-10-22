@@ -2,10 +2,13 @@
 models/*.pt
 models/*.onnx
 models/*.mlpackage/
-# ...except the two the app ships with (needed to build the installers)
+# ...except the ones the app ships with (needed to build the installers)
 !models/Player_Detection.pt
 !models/NumbersRec.pt
 !models/Player_Detection.mlpackage/
+# BoT-SORT's ReID encoder on the CoreML path; ultralytics downloads it at run
+# time otherwise, and an installed app has nowhere to put it.
+!models/yolo26n-cls.pt
 
 # ===== Videos & media =====
 *.mp4
@@ -71,4 +74,3 @@ webapp/packaging/MicrosoftEdgeWebview2Setup.exe
 .claude/
 *.bak
 webapp/training_dataset/
-webapp/yolo26n-cls.pt

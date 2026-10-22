@@ -33,8 +33,12 @@ jobs:
         # PyTorch stopped shipping macOS x86_64 wheels after 2.2.2, and that
         # build is compiled against numpy 1.x.
         run: pip install "torch==2.2.2" "torchvision==0.17.2" "numpy<2"
+      - name: parity guards
+        run: python webapp/test_parity.py
       - run: PY=python bash webapp/packaging/build_macos.sh
       - name: selftest
+        # Offline check of the built app: pages, detector, tracker, H.264 writer.
+        # A failure prints the whole run and stops the release.
         run: "'webapp/dist/Player Tracking.app/Contents/MacOS/PlayerTracking' --selftest"
       - uses: actions/upload-artifact@v4
         with:
@@ -64,9 +68,13 @@ jobs:
           python tools/make_icons.py
           python -m PyInstaller packaging/player_tracking.spec --noconfirm
       - name: selftest
+        # A windowed exe writes nothing to the console, so the run is read back
+        # from the log it leaves behind - printed whether it passed or failed.
         run: |
           $p = Start-Process -FilePath "webapp\dist\PlayerTracking\PlayerTracking.exe" -ArgumentList "--selftest" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Get-Content webapp\dist\PlayerTracking\psf_selftest.log; exit 1 }
+          $log = "webapp\dist\PlayerTracking\psf_selftest.log"
+          if (Test-Path $log) { Get-Content $log } else { "no selftest log was written" }
+          if ($p.ExitCode -ne 0) { exit 1 }
       - name: installer
         run: |
           cd webapp/packaging

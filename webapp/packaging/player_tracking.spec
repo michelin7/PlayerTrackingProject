@@ -13,6 +13,16 @@ APP = Path(SPECPATH).resolve().parent          # webapp/
 VERSION = os.environ.get("PT_VERSION", "0.0.0")
 ROOT = APP.parent                              # project root
 
+MAC_ARM = sys.platform == "darwin" and platform.machine() == "arm64"
+
+excludes = ["tkinter", "PyQt5", "PyQt6", "PySide2", "PySide6", "IPython",
+            "jupyter", "notebook", "tensorflow", "onnxruntime", "pytest",
+            # dragged in from the dev environment, unused by the app
+            "polars", "playwright", "numba", "llvmlite", "skimage",
+            "imageio", "imageio_ffmpeg", "statsmodels", "patsy", "sympy",
+            "panel", "holoviews", "datashader",
+            "onnx", "openvino", "tensorboard", "dask", "bokeh", "zmq"]
+
 datas = [
     (str(APP / "templates"), "templates"),
     (str(APP / "static"), "static"),
@@ -21,9 +31,13 @@ datas = [
     (str(ROOT / "models" / "NumbersRec.pt"), "models"),
 ]
 # The CoreML detector is only ever loaded on MPS, so it is dead weight anywhere else.
-if sys.platform == "darwin" and platform.machine() == "arm64":
+if MAC_ARM:
     datas.append((str(ROOT / "models" / "Player_Detection.mlpackage"),
                   "models/Player_Detection.mlpackage"))
+    # BoT-SORT can only read appearance features out of a torch detector, so on
+    # the CoreML path it needs this separate ReID encoder. Shipped because
+    # ultralytics otherwise downloads it mid-job into the working directory.
+    datas.append((str(ROOT / "models" / "yolo26n-cls.pt"), "models"))
 
 binaries, hiddenimports = [], collect_submodules("sklearn.utils")
 
@@ -38,6 +52,12 @@ for mod in ("ultralytics.trackers", "ultralytics.nn", "ultralytics.models",
 # pywebview draws its window through pythonnet on Windows, and the CLR
 # runtime files do not come along with a plain import scan.
 packages = ["torch", "torchvision"]
+if MAC_ARM:
+    # ultralytics imports coremltools inside the loader, so an import scan never
+    # sees the one package that can actually run the .mlpackage above. Without it
+    # the detector falls back to the 4x slower PyTorch weights. sympy rides along.
+    packages.append("coremltools")
+    excludes.remove("sympy")
 if sys.platform == "win32":
     packages.append("pythonnet")
     hiddenimports += ["clr"]
@@ -54,13 +74,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    excludes=["tkinter", "PyQt5", "PyQt6", "PySide2", "PySide6", "IPython",
-              "jupyter", "notebook", "tensorflow", "onnxruntime", "pytest",
-              # dragged in from the dev environment, unused by the app
-              "polars", "playwright", "numba", "llvmlite", "skimage",
-              "imageio", "imageio_ffmpeg", "statsmodels", "patsy", "sympy",
-              "panel", "holoviews", "datashader",
-              "onnx", "openvino", "tensorboard", "dask", "bokeh", "zmq"],
+    excludes=excludes,
     noarchive=False,
 )
 pyz = PYZ(a.pure)

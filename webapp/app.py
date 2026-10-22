@@ -24,6 +24,12 @@ from werkzeug.utils import secure_filename
 FROZEN = getattr(sys, "frozen", False)
 BASE_DIR = Path(__file__).resolve().parent
 
+if FROZEN:
+    # A missing optional package makes ultralytics run
+    # `sys.executable -m pip install <pkg>` — and in a bundle sys.executable is
+    # the app itself, so it opens a second window and waits for it forever.
+    os.environ["YOLO_AUTOINSTALL"] = "False"
+
 
 def user_data_dir():
     if sys.platform == "darwin":
@@ -52,6 +58,12 @@ CONFIGS_FOLDER = DATA_DIR / "configs"
 for _d in (UPLOAD_FOLDER, RESULTS_FOLDER, CONFIGS_FOLDER,
            TRAINING_FOLDER / "images", TRAINING_FOLDER / "labels"):
     _d.mkdir(parents=True, exist_ok=True)
+
+if FROZEN:
+    # Launched from the Finder the process starts in "/", so any library that
+    # writes to a relative path lands in a read-only directory. Our own paths are
+    # all absolute; this is for the defaults of the code we don't own.
+    os.chdir(DATA_DIR)
 
 # ---------------------------------------------------------------------------
 # Flask app
@@ -1398,7 +1410,7 @@ def squad_lines(config_data):
                      "forward": groups("away_forward_lines")}}
 
 
-def effective_tracker(base_path, out_dir, fps):
+def effective_tracker(base_path, out_dir, fps, coreml_det=False):
     """Write the tracker config a run actually uses: the base yaml with
     track_buffer scaled to this video's fps.
 
@@ -1420,6 +1432,13 @@ def effective_tracker(base_path, out_dir, fps):
         txt = open(base_path).read()
         txt = _set(txt, "track_buffer", buf)
         txt = _set(txt, "new_track_thresh", NEW_TRACK_THRESH)
+        # ReID "auto" takes appearance features from the detector itself, but a
+        # CoreML detector is not a torch module, so ultralytics silently falls
+        # back to downloading yolo26n-cls.pt into the CURRENT directory — which
+        # for an installed app is "/" and read-only. Name the shipped copy.
+        reid = MODELS_DIR / "yolo26n-cls.pt"
+        if coreml_det and reid.exists():
+            txt = _set(txt, "model", f'"{reid}"')
         eff = out_dir / "tracker_effective.yaml"
         eff.write_text(txt)
         print(f"[tracker] {os.path.basename(base_path)} -> track_buffer={buf} "
@@ -1429,6 +1448,25 @@ def effective_tracker(base_path, out_dir, fps):
     except Exception as e:
         print(f"[tracker] rewrite skipped: {e}", flush=True)
         return str(base_path)
+
+
+def load_detector(det_path, device):
+    """Load the player detector, preferring the CoreML export when it can run.
+
+    CoreML needs coremltools, an optional package, so the .mlpackage can fail to
+    load on a machine where the .pt runs fine — as it did in the 1.0.1 build.
+    Both modes fall back instead of losing the run. Returns (model, using_coreml).
+    """
+    from ultralytics import YOLO
+
+    if det_path.endswith(".mlpackage"):
+        try:
+            return YOLO(det_path, task="detect"), True
+        except Exception as e:
+            print(f"[models] CoreML detector unavailable ({e}); using PyTorch weights",
+                  flush=True)
+            det_path = det_path.replace(".mlpackage", ".pt")
+    return YOLO(det_path).to(device), False
 
 
 def write_clip_range(src, dst, fps, start=0.0, end=None):
@@ -1683,11 +1721,7 @@ def process_video_job(job_id, video_path, config_data):
                 set_msg(job, "job_m_nomodel", f"Модель не найдена: {label}", name=label)
                 return
 
-        use_coreml = detection_path.endswith(".mlpackage")
-        if use_coreml:
-            model_det = YOLO(detection_path, task="detect")
-        else:
-            model_det = YOLO(detection_path).to(device)
+        model_det, use_coreml = load_detector(detection_path, device)
         model_num = YOLO(number_path).to(device)
 
         # Enable FP16 inference on CUDA for speedup
@@ -1872,7 +1906,7 @@ def process_video_job(job_id, video_path, config_data):
         # lost track re-link onto a look-alike (id jumps between players). Keep the
         # buffer moderate and let a new player get a fresh id rather than inherit a
         # stale one. Same builder as Live — see effective_tracker().
-        tracker_path = effective_tracker(tracker_path, result_dir, fps)
+        tracker_path = effective_tracker(tracker_path, result_dir, fps, use_coreml)
 
         # Prefetch: decode frames in a background thread so the accelerator never
         # waits on cap.read(). A small bounded queue overlaps decode with
@@ -3558,7 +3592,7 @@ def _load_live_pipeline(config_data):
         if not os.path.exists(p):
             raise FileNotFoundError(os.path.basename(p))
 
-    model_det = YOLO(det_path, task="detect") if det_path.endswith(".mlpackage") else YOLO(det_path).to(device)
+    model_det, use_coreml = load_detector(det_path, device)
     model_num = YOLO(num_path).to(device)
 
     # FP16 on CUDA (Windows/Linux NVIDIA) — ~2x speedup, matches Automate mode.
@@ -3567,7 +3601,7 @@ def _load_live_pipeline(config_data):
     if use_half:
         model_det.model.half()
         model_num.model.half()
-    print(f"[Live] Device: {device}, CoreML det: {det_path.endswith('.mlpackage')}, FP16: {use_half}", flush=True)
+    print(f"[Live] Device: {device}, CoreML det: {use_coreml}, FP16: {use_half}", flush=True)
 
     teams_colors_info = config_data.get("teams_colors_info", {"Home": ["blue"], "Away": ["white", "red"]})
     basic_colors = {}
@@ -3575,7 +3609,7 @@ def _load_live_pipeline(config_data):
         basic_colors[name] = tuple(rgb) if isinstance(rgb, list) else rgb
     identifier = PlayerIdentifier(teams_colors_info, config_data.get("home_team", {}),
                                   config_data.get("away_team", {}), basic_colors or BASIC_COLORS, model_num)
-    return model_det, identifier, tracker_path, 640, device, use_half
+    return model_det, identifier, tracker_path, 640, device, use_half, use_coreml
 
 
 @app.route("/analysis")
@@ -3610,7 +3644,8 @@ def live_start():
         except json.JSONDecodeError:
             return jsonify({"error": "Невалидная конфигурация (JSON)"}), 400
     try:
-        model_det, identifier, tracker_path, det_imgsz, device, use_half = _load_live_pipeline(config_data)
+        (model_det, identifier, tracker_path, det_imgsz,
+         device, use_half, use_coreml) = _load_live_pipeline(config_data)
     except FileNotFoundError as e:
         return jsonify({"error": f"Модель не найдена: {e}"}), 500
     except ImportError:
@@ -3629,7 +3664,7 @@ def live_start():
     sid = hashlib.md5(f"live_{filename}_{time.time()}".encode()).hexdigest()[:12]
     out_dir = RESULTS_FOLDER / f"live_{sid}"
     out_dir.mkdir(parents=True, exist_ok=True)
-    tracker_path = effective_tracker(tracker_path, out_dir, fps)
+    tracker_path = effective_tracker(tracker_path, out_dir, fps, use_coreml)
     live_session = live_mod.LiveSession(cap, model_det, identifier, tracker_path,
                                         fps, total, out_dir, det_imgsz,
                                         lines=squad_lines(config_data), video_path=video_path,

@@ -6,6 +6,8 @@ opencv (5-10 s), so the window opens on a loading page first and swaps to the
 real UI once the server is up — otherwise a double-click looks like nothing
 happened and people click again.
 """
+import contextlib
+import io
 import os
 import socket
 import subprocess
@@ -81,10 +83,12 @@ def boot(window):
 
 
 def selftest():
-    """Headless smoke test of a packaged build: the server answers and the
-    H.264 writer really produces a playable file. The writer is the one that
-    fails silently off macOS - opencv there has no avc1 encoder and still
-    reports success, leaving every player clip empty.
+    """Headless smoke test of a packaged build, offline: the server answers, the
+    detector loads and tracks, and the H.264 writer really produces a playable
+    file. All three fail silently - opencv off macOS has no avc1 encoder and
+    still reports success, a detector that cannot load only shows up mid-job,
+    and a model fetched at run time works on a runner but not on a user's
+    machine. Run on every platform that gets an installer.
     """
     import tempfile
     import urllib.request
@@ -107,6 +111,50 @@ def selftest():
     assert app_mod.MODELS_DIR.joinpath("NumbersRec.pt").exists(), "number model missing"
     assert app_mod.TRACKERS_DIR.joinpath("tracker.yaml").exists(), "tracker config missing"
 
+    # From here the build has to stand on its own. A CI runner is online, so a
+    # model ultralytics quietly fetches mid-job succeeds there and fails on the
+    # user's machine - that is how 1.0.1 shipped needing a 6 MB download. Child
+    # processes go too: a blocked urllib falls back to curl, and a missing
+    # package makes ultralytics run `sys.executable -m pip install`, which in a
+    # bundle re-launches the app. Both are refused rather than hidden.
+    connect, popen = socket.socket.connect, subprocess.Popen
+
+    def loopback_only(self, address, *args, **kwargs):
+        host = address[0] if isinstance(address, tuple) else ""
+        if host not in ("127.0.0.1", "::1", "localhost"):
+            raise OSError(f"selftest is offline on purpose, tried to reach {address}")
+        return connect(self, address, *args, **kwargs)
+
+    def no_fetch(args, *rest, **kwargs):
+        # Only fetchers and installers are refused: coremltools shells out to
+        # sw_vers on every CoreML prediction, and that has to keep working.
+        line = " ".join(map(str, args)) if isinstance(args, (list, tuple)) else str(args)
+        if any(w in line for w in ("http://", "https://", "curl", "wget", "pip")):
+            raise OSError(f"selftest fetches nothing on purpose, tried to run {line}")
+        return popen(args, *rest, **kwargs)
+
+    socket.socket.connect, subprocess.Popen = loopback_only, no_fetch
+
+    # Load the detector the way a job does. Shipping the .mlpackage without
+    # coremltools passed every earlier check and then failed on the user's
+    # first video, so the build is only good if the model it ships actually runs.
+    coreml = app_mod.MODELS_DIR / "Player_Detection.mlpackage"
+    det = coreml if coreml.exists() else app_mod.MODELS_DIR / "Player_Detection.pt"
+    model, used_coreml = app_mod.load_detector(str(det), "cpu")
+    assert used_coreml == coreml.exists(), "bundled .mlpackage did not load"
+    if used_coreml:
+        # BoT-SORT cannot read features out of a CoreML detector and needs this
+        # encoder; without it ultralytics downloads one mid-job.
+        assert app_mod.MODELS_DIR.joinpath("yolo26n-cls.pt").exists(), "ReID encoder missing"
+    # One tracked frame, not just a detection: the tracker builds its ReID
+    # encoder and its assignment solver on the first call, and both have failed
+    # in a packaged build while plain detection kept working.
+    tracker = app_mod.effective_tracker(str(app_mod.TRACKERS_DIR / "tracker_stable.yaml"),
+                                        Path(tempfile.mkdtemp()), 25.0, used_coreml)
+    model.track(np.zeros((640, 640, 3), dtype=np.uint8), imgsz=640,
+                tracker=tracker, persist=True, verbose=False)
+    print(f"  detector tracks (CoreML: {used_coreml})")
+
     clip = Path(tempfile.gettempdir()) / "psf_selftest.mp4"
     writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"avc1"), 25, (320, 240))
     assert writer.isOpened(), "VideoWriter did not open"
@@ -127,14 +175,22 @@ def selftest():
 
 def main():
     if "--selftest" in sys.argv:
+        out = io.StringIO()
         try:
-            return selftest()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                code = selftest()
         except Exception:
-            # A windowed build has no console, so CI would see only an exit code.
-            log = Path(sys.executable).parent / "psf_selftest.log"
-            log.write_text(traceback.format_exc(), encoding="utf-8")
-            print(traceback.format_exc(), file=sys.stderr)
-            return 1
+            out.write(traceback.format_exc())
+            code = 1
+        # A windowed build has no console: on Windows nothing we print reaches
+        # the CI log, so the whole run goes to a file the workflow reads out.
+        try:
+            (Path(sys.executable).parent / "psf_selftest.log").write_text(
+                out.getvalue(), encoding="utf-8")
+        except OSError:
+            pass
+        print(out.getvalue())
+        return code
     try:
         import webview
     except ImportError:

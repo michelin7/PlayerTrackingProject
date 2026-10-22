@@ -114,7 +114,8 @@ Configuration → Detection & Tracking → Identification → Review → Results
 ├── models/
 │   ├── Player_Detection.pt     # 21 MB — in the repository
 │   ├── Player_Detection.mlpackage  # 21 MB — CoreML export, macOS
-│   └── NumbersRec.pt           # 19 MB — in the repository
+│   ├── NumbersRec.pt           # 19 MB — in the repository
+│   └── yolo26n-cls.pt          # 6 MB — ReID encoder for BoT-SORT
 ├── trackers/
 │   ├── tracker_stable.yaml     # BoT-SORT + ReID (used by default)
 │   ├── tracker_fast.yaml       # Looser thresholds
@@ -195,14 +196,15 @@ pip install -r webapp/requirements.txt
 
 ### 3. Models
 
-The two models the app loads are tracked in this repository, so a clone has
-everything it needs:
+Every model the app loads is tracked in this repository, so a clone has
+everything it needs and nothing is downloaded at run time:
 
 | File | Description | Size |
 |---|---|---|
 | `Player_Detection.pt` | Player detection | 21 MB |
 | `NumbersRec.pt` | Jersey number recognition | 19 MB |
 | `Player_Detection.mlpackage` | CoreML export of the detector, used on Apple Silicon | 21 MB |
+| `yolo26n-cls.pt` | BoT-SORT ReID encoder, used on the CoreML path | 6 MB |
 
 ### 4. Run
 
@@ -220,10 +222,10 @@ installed build runs; that path additionally needs `pip install pywebview`, whic
 ### 5. (Optional) re-export the CoreML model
 
 The detector is loaded from `Player_Detection.mlpackage` whenever the app runs
-on MPS, and that export is already in the repository. To rebuild it:
+on MPS (`coremltools` is part of `requirements.txt` on Apple Silicon), and that
+export is already in the repository. To rebuild it:
 
 ```bash
-pip install coremltools>=9.0
 python -c "from ultralytics import YOLO; YOLO('models/Player_Detection.pt').export(format='coreml', imgsz=640, nms=False)"
 ```
 

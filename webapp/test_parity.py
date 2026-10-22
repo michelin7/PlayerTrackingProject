@@ -69,10 +69,19 @@ def test_detection_call_parameters_match():
         assert key in live_call.replace(" ", "").replace("\n", "") or key in live_call, (key, live_call)
 
 
+def test_both_modes_load_the_detector_the_same_way():
+    # The CoreML detector needs coremltools, which the packaged app may not have.
+    # One mode falling back and the other dying is how a build breaks in half.
+    src = (HERE / "app.py").read_text()
+    assert src.count("= load_detector(") == 2, "a mode stopped using load_detector()"
+    assert src.count('task="detect"') == 1, "a mode loads the CoreML detector on its own again"
+
+
 if __name__ == "__main__":
     test_both_modes_build_the_same_tracker()
     test_track_buffer_scales_with_fps_and_has_a_floor()
     test_live_does_not_keep_its_own_tracker_file()
     test_live_never_blocks_on_a_question()
     test_detection_call_parameters_match()
+    test_both_modes_load_the_detector_the_same_way()
     print("live/automate parity OK")
