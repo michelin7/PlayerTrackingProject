@@ -766,6 +766,7 @@ const I18N = {
     const STORAGE_KEY = "psf_lang_v2";
     let currentLang = localStorage.getItem(STORAGE_KEY) || "en";
     const listeners = [];
+    let notifying = false;
 
     function format(str, vars) {
         if (!vars) return str;
@@ -819,10 +820,20 @@ const I18N = {
         const btn = document.getElementById("langToggle");
         if (btn) btn.textContent = lang === "ru" ? "EN" : "RU";
 
-        // Notify listeners (e.g. re-render dynamic chart labels / tables)
-        listeners.forEach(fn => {
-            try { fn(lang); } catch (e) { console.error(e); }
-        });
+        // Notify listeners (e.g. re-render dynamic chart labels / tables). A
+        // listener that re-renders markup carrying data-i18n has to translate it,
+        // so it calls applyLang again: notifying from inside a notification
+        // recurses until the renderer gives up. That is what hung the result page
+        // - thousands of levels deep, each one rebuilding every player's video.
+        if (notifying) return;
+        notifying = true;
+        try {
+            listeners.forEach(fn => {
+                try { fn(lang); } catch (e) { console.error(e); }
+            });
+        } finally {
+            notifying = false;
+        }
     }
 
     function onChange(fn) {

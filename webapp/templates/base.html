@@ -10,13 +10,23 @@
     // Nobody can open a developer console in the desktop window, so a page
     // error has to reach the run log or it leaves no trace at all.
     (function () {
+        let left = 20;          // a page that errors in a loop must not flood the log
         function report(message) {
+            if (left-- <= 0) return;
             try {
                 fetch('/api/clientlog', {method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({message: message, page: location.pathname})});
             } catch (e) { /* nothing left to report with */ }
         }
+        // console.error as well as uncaught errors: code that catches an exception
+        // and only logs it leaves no other trace, which is how the result page's
+        // runaway recursion stayed invisible in the run log.
+        const logged = console.error;
+        console.error = function () {
+            report('console.error: ' + [...arguments].map(a => (a && a.stack) || a).join(' '));
+            logged.apply(console, arguments);
+        };
         window.addEventListener('error', e =>
             report((e.message || 'error') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || 0)));
         window.addEventListener('unhandledrejection', e =>

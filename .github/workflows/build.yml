@@ -35,6 +35,11 @@ jobs:
         run: pip install "torch==2.2.2" "torchvision==0.17.2" "numpy<2"
       - name: parity guards
         run: python webapp/test_parity.py
+      - name: page self-checks
+        # The pages carry real logic (shift grouping, the roster picker, the
+        # language switch) and nothing else exercises it; a broken page is only
+        # visible after the installer is in someone's hands.
+        run: for f in webapp/tools/test_*.mjs; do node "$f" || exit 1; done
       - run: PY=python bash webapp/packaging/build_macos.sh
       - name: selftest
         # Offline check of the built app: pages, detector, tracker, H.264 writer.
